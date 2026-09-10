@@ -1,0 +1,821 @@
+/* =============================================================================
+ *  style.css — DIRECTION ARTISTIQUE « TELEGRAM NATIF »
+ * -----------------------------------------------------------------------------
+ *  Fond uni issu de themeParams, cartes groupées à coins 14px, séparateurs fins
+ *  en retrait, typographie système, accent bleu Telegram, beaucoup d'air.
+ *  Aucune fioriture : le seul élément spectaculaire est la scène emoji.
+ *  Animations : cubic-bezier(.22,1,.36,1), 180-320 ms, micro-rebonds de 2-4 px.
+ * ========================================================================== */
+
+/* =============================================================================
+ * 1. JETONS DE THÈME
+ *    Valeurs de repli = thème clair iOS. app.js écrase ces variables avec les
+ *    vraies `themeParams` de Telegram (inline sur <html>, donc prioritaires).
+ * ========================================================================== */
+
+:root {
+  --tg-theme-bg-color: #ffffff;
+  --tg-theme-text-color: #000000;
+  --tg-theme-hint-color: #8e8e93;
+  --tg-theme-link-color: #007aff;
+  --tg-theme-button-color: #007aff;
+  --tg-theme-button-text-color: #ffffff;
+  --tg-theme-secondary-bg-color: #efeff4;
+
+  /* Rôles dérivés : page = fond secondaire, cartes = fond principal (liste iOS) */
+  --page-bg: var(--tg-theme-secondary-bg-color);
+  --card-bg: var(--tg-theme-bg-color);
+  --text: var(--tg-theme-text-color);
+  --hint: var(--tg-theme-hint-color);
+  --accent: var(--tg-theme-button-color);
+  --accent-ink: var(--tg-theme-link-color);
+  --separator: color-mix(in srgb, var(--hint) 30%, transparent);
+  --card-edge: color-mix(in srgb, var(--hint) 14%, transparent);
+  --press: color-mix(in srgb, var(--hint) 16%, transparent);
+
+  /* Palette des niveaux — teinte « graphique » + teinte « encre » (texte) */
+  --c-empty: #8e8e93;      --c-empty-ink: #6d6d72;
+  --c-faible: #ff453a;     --c-faible-ink: #c9271d;
+  --c-moyen: #ff9f0a;      --c-moyen-ink: #a86200;
+  --c-fort: #30d158;       --c-fort-ink: #1a8b3c;
+  --c-tres: #a855f7;       --c-tres-ink: #7b2fdb;   --c-tres-2: #3b82f6;
+
+  /* Rythme */
+  --radius: 14px;
+  --radius-sm: 10px;
+  --gutter: 16px;
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --dur-fast: 180ms;
+  --dur: 240ms;
+  --dur-slow: 320ms;
+}
+
+/* Thème sombre : suivi automatique hors Telegram, ou forcé par app.js. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-scheme="light"]) {
+    --tg-theme-bg-color: #1c1c1d;
+    --tg-theme-text-color: #ffffff;
+    --tg-theme-hint-color: #98989e;
+    --tg-theme-link-color: #3e88f7;
+    --tg-theme-button-color: #3e88f7;
+    --tg-theme-secondary-bg-color: #000000;
+    --c-empty-ink: #9a9aa0;
+    --c-faible-ink: #ff6961;
+    --c-moyen-ink: #ffb340;
+    --c-fort-ink: #4ade7d;
+    --c-tres-ink: #c084fc;
+  }
+}
+
+:root[data-scheme="dark"] {
+  --c-empty-ink: #9a9aa0;
+  --c-faible-ink: #ff6961;
+  --c-moyen-ink: #ffb340;
+  --c-fort-ink: #4ade7d;
+  --c-tres-ink: #c084fc;
+  --separator: color-mix(in srgb, var(--hint) 34%, transparent);
+  --card-edge: color-mix(in srgb, var(--hint) 20%, transparent);
+}
+
+/* Couleur active, pilotée par data-level sur .app */
+.app { --level: var(--c-empty); --level-2: var(--c-empty); --level-ink: var(--c-empty-ink); }
+.app[data-level="faible"]    { --level: var(--c-faible); --level-2: var(--c-faible); --level-ink: var(--c-faible-ink); }
+.app[data-level="moyen"]     { --level: var(--c-moyen);  --level-2: var(--c-moyen);  --level-ink: var(--c-moyen-ink); }
+.app[data-level="fort"]      { --level: var(--c-fort);   --level-2: var(--c-fort);   --level-ink: var(--c-fort-ink); }
+.app[data-level="tres_fort"] { --level: var(--c-tres);   --level-2: var(--c-tres-2); --level-ink: var(--c-tres-ink); }
+
+/* =============================================================================
+ * 2. BASE
+ * ========================================================================== */
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  font-size: 17px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.app {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 10px var(--gutter) calc(28px + env(safe-area-inset-bottom, 0px));
+}
+
+h1, h2, p, ul { margin: 0; }
+ul { list-style: none; padding: 0; }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* =============================================================================
+ * 3. EN-TÊTE + SÉLECTEUR DE LANGUE
+ * ========================================================================== */
+
+.topbar { padding: 6px 4px 18px; }
+
+.topbar__line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.topbar__title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.topbar__subtitle {
+  margin-top: 5px;
+  font-size: 14px;
+  color: var(--hint);
+}
+
+/* Segmented control façon iOS/Telegram : une pastille qui glisse. */
+.seg {
+  position: relative;
+  display: flex;
+  padding: 2px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--hint) 20%, transparent);
+  flex: none;
+}
+
+.seg__thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: calc((100% - 4px) / 3);
+  height: calc(100% - 4px);
+  border-radius: 7px;
+  background: var(--card-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .16);
+  transform: translateX(0);
+  transition: transform var(--dur) var(--ease);
+}
+
+.seg__btn {
+  position: relative;
+  z-index: 1;
+  min-width: 38px;
+  padding: 5px 2px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .2px;
+  color: var(--hint);
+  transition: color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+
+.seg__btn.is-active { color: var(--text); }
+.seg__btn:active { transform: scale(.94); }
+
+/* =============================================================================
+ * 4. SCÈNE EMOJI — le seul moment spectaculaire
+ * ========================================================================== */
+
+.scene {
+  position: relative;
+  height: 152px;
+  margin: 4px 0 22px;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.scene__aura {
+  position: absolute;
+  width: 210px; height: 210px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+              color-mix(in srgb, var(--level) 46%, transparent) 0%,
+              color-mix(in srgb, var(--level-2) 20%, transparent) 42%,
+              transparent 68%);
+  filter: blur(8px);
+  opacity: .9;
+  animation: auraBreathe 5.2s ease-in-out infinite;
+  transition: background var(--dur-slow) var(--ease);
+  z-index: -1;
+}
+
+/* Anneau qui se propage au moment d'un changement de niveau. */
+.scene__ring {
+  position: absolute;
+  width: 118px; height: 118px;
+  border-radius: 50%;
+  border: 2px solid var(--level);
+  opacity: 0;
+  z-index: -1;
+}
+.scene__ring.is-pop { animation: ringPop 640ms var(--ease); }
+
+.scene__stage {
+  position: relative;
+  width: 130px; height: 130px;
+}
+
+.scene__lottie { position: absolute; inset: 0; }
+
+/* --- Les 5 visages se superposent, un seul est actif ---------------------- */
+.face {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0;
+  transform: scale(.84);
+  transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  pointer-events: none;
+}
+
+.face.is-active {
+  opacity: 1;
+  animation: facePop 460ms var(--ease) both;
+}
+
+.face__ink {
+  fill: none;
+  stroke: #2b2b30;
+  stroke-width: 4.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.face__ink--fill { fill: #2b2b30; }
+.face__mouthFill { fill: #2b2b30; }
+/* Le visage endormi est gris : son trait est plus doux que le noir des autres. */
+.face[data-face="empty"] .face__ink { stroke: #454e5c; }
+.face[data-face="empty"] .face__mouthFill { fill: #454e5c; }
+
+.face__head { transition: fill var(--dur) var(--ease); }
+
+/* Visage endormi : respiration lente + zzz */
+.face__breathe { animation: breathe 3.6s ease-in-out infinite; transform-origin: 64px 100px; }
+.face__z { fill: none; stroke: #9aa3b0; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+.face__z--1 { animation: zFloat 3.6s ease-in-out infinite; }
+.face__z--2 { animation: zFloat 3.6s ease-in-out .5s infinite; }
+.face__z--3 { animation: zFloat 3.6s ease-in-out 1s infinite; }
+
+/* Visage inquiet : tremblement + goutte qui tombe */
+.face__shake { animation: shake .36s ease-in-out infinite; transform-origin: 64px 66px; }
+.face__drop { animation: dropFall 1.9s ease-in infinite; }
+
+/* Visage pensif : balancement */
+.face__sway { animation: sway 2.8s ease-in-out infinite; transform-origin: 64px 104px; }
+
+/* Lunettes : hochement + reflet balayant */
+.face__nod { animation: nod 2.4s ease-in-out infinite; transform-origin: 64px 104px; }
+.face__glare { animation: glare 3s var(--ease) infinite; }
+
+/* Très fort : pulsation, orbite d'étoiles, éclat arc-en-ciel */
+.face__pulse { animation: pulse 2.6s ease-in-out infinite; transform-origin: 64px 66px; }
+.face__orbit { animation: orbit 9s linear infinite; transform-origin: 64px 66px; }
+.face__star { fill: #ffd43b; }
+.face__star--a { animation: twinkle 1.8s ease-in-out infinite; }
+.face__star--b { animation: twinkle 1.8s ease-in-out .6s infinite; }
+.face__star--c { animation: twinkle 1.8s ease-in-out 1.2s infinite; }
+.face__eyestar {
+  fill: #fff;
+  stroke: #2b2b30;
+  stroke-width: 1.6;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: eyeTwinkle 2.2s ease-in-out infinite;
+}
+.face__rainbow { animation: rainbowSweep 3.6s var(--ease) infinite; }
+
+/* =============================================================================
+ * 5. CARTES, LIGNES, SÉPARATEURS
+ * ========================================================================== */
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.section-title {
+  margin: 0 0 8px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: var(--hint);
+}
+
+/* Séparateur fin, en retrait à gauche comme dans Telegram. */
+.sep {
+  height: 1px;
+  margin-left: 16px;
+  background: var(--separator);
+  transform: scaleY(.5);
+  transform-origin: top;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  text-align: left;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.row--action { color: var(--accent-ink); font-weight: 500; }
+.row--action:active,
+.row--toggle:active { background: var(--press); }
+.row--action .row__label { flex: 1; }
+
+.row--data { justify-content: space-between; }
+.row--data .row__label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 16px;
+}
+.row__value {
+  flex: none;
+  color: var(--hint);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.row--toggle { justify-content: space-between; font-weight: 500; }
+.chev {
+  width: 18px; height: 18px;
+  flex: none;
+  fill: none;
+  stroke: var(--hint);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--dur) var(--ease);
+}
+.row--toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+
+/* Badge « bonus » : hors cahier des charges, visuellement à part. */
+.badge {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+}
+
+/* =============================================================================
+ * 6. CHAMP MOT DE PASSE
+ * ========================================================================== */
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 16px;
+  border-left: 3px solid transparent;
+  transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+
+.field.is-filled { border-left-color: var(--level); }
+.field.is-focused { background: color-mix(in srgb, var(--level) 6%, transparent); }
+
+.field__input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  letter-spacing: .2px;
+  outline: none;
+}
+.field__input::placeholder { color: var(--hint); }
+.field__input:focus-visible { outline: none; }
+
+.field__actions { display: flex; align-items: center; gap: 2px; flex: none; }
+
+.iconbtn {
+  display: grid;
+  place-items: center;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  color: var(--hint);
+  transition: color var(--dur-fast) var(--ease),
+              background-color var(--dur-fast) var(--ease),
+              transform var(--dur-fast) var(--ease);
+}
+.iconbtn:active { transform: scale(.9); background: var(--press); }
+.iconbtn[aria-pressed="true"] { color: var(--accent-ink); }
+/* `display: grid` l'emporterait sur la règle navigateur [hidden] : on rétablit. */
+.iconbtn[hidden] { display: none; }
+
+.icon {
+  width: 22px; height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon--lead { width: 24px; height: 24px; flex: none; color: var(--accent-ink); }
+.icon--lead .dot { fill: currentColor; stroke: none; }
+
+/* Barre de l'œil barré : se rétracte quand le mot de passe est visible. */
+.icon__slash {
+  stroke-dasharray: 22;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset var(--dur) var(--ease);
+}
+.iconbtn[aria-pressed="true"] .icon__slash { stroke-dashoffset: 22; }
+
+/* =============================================================================
+ * 7. BARRE DE FORCE + NIVEAU
+ * ========================================================================== */
+
+.card--meter { padding: 16px; }
+
+.meter__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.meter__level {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--level-ink);
+  transition: color var(--dur-slow) var(--ease);
+}
+
+.meter__pct {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--hint);
+}
+
+.bar { display: flex; gap: 6px; }
+
+.bar__seg {
+  position: relative;
+  flex: 1;
+  height: 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--hint) 24%, transparent);
+  overflow: hidden;
+}
+
+.bar__fill {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--level), var(--level-2));
+  transition: width var(--dur-slow) var(--ease), background var(--dur-slow) var(--ease);
+}
+
+/* Effet « shimmer » réservé au niveau Très fort. */
+.bar.is-max .bar__fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%,
+              rgba(255, 255, 255, .75) 50%, transparent 70%);
+  animation: shimmer 1.9s linear infinite;
+}
+
+.meter__advice {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--hint);
+}
+
+/* =============================================================================
+ * 8. CHECK-LIST DES CRITÈRES
+ * ========================================================================== */
+
+.crit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 10px 16px;
+  font-size: 16px;
+  color: var(--hint);
+  transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.crit + .crit { border-top: 1px solid var(--separator); }
+.crit.is-ok { color: var(--text); }
+
+/* Ligne qui s'illumine brièvement quand le critère devient valide. */
+.crit.is-lit { background: color-mix(in srgb, var(--level) 12%, transparent); }
+
+.crit__box {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24px; height: 24px;
+  flex: none;
+  border-radius: 50%;
+  border: 1.6px solid var(--separator);
+  background: transparent;
+  transition: background-color var(--dur) var(--ease),
+              border-color var(--dur) var(--ease),
+              transform var(--dur) var(--ease);
+}
+.crit.is-ok .crit__box {
+  background: var(--level);
+  border-color: var(--level);
+  transform: scale(1.06);
+}
+
+/* Coche dessinée au trait (stroke-dasharray). */
+.crit__check {
+  width: 16px; height: 16px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 26;
+  stroke-dashoffset: 26;
+  transition: stroke-dashoffset var(--dur-slow) var(--ease);
+}
+.crit.is-ok .crit__check { stroke-dashoffset: 0; }
+
+.crit__label { flex: 1; }
+.crit__value {
+  flex: none;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--hint);
+}
+.crit.is-ok .crit__value { color: var(--level-ink); font-weight: 600; }
+
+/* =============================================================================
+ * 9. BLOC DÉTAILS REPLIABLE
+ * ========================================================================== */
+
+.collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-slow) var(--ease);
+}
+.collapse.is-open { grid-template-rows: 1fr; }
+.collapse__inner { overflow: hidden; }
+
+.warns { display: flex; flex-direction: column; }
+
+.warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--separator);
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.warn::before {
+  content: "!";
+  display: grid;
+  place-items: center;
+  width: 20px; height: 20px;
+  flex: none;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--c-moyen);
+  color: #1b1b1f;
+  font-size: 13px;
+  font-weight: 700;
+}
+.warn--danger::before { background: var(--c-faible); color: #fff; }
+.warn__badge { margin-left: auto; }
+
+.tip {
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--hint);
+}
+.tip--muted {
+  padding-top: 0;
+  font-size: 12.5px;
+  opacity: .8;
+}
+
+/* =============================================================================
+ * 10. PIED DE PAGE, TOAST, CONFETTIS
+ * ========================================================================== */
+
+.footer {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 4px 16px 8px;
+}
+.footer__lock {
+  width: 17px; height: 17px;
+  flex: none;
+  margin-top: 1px;
+  fill: none;
+  stroke: var(--hint);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.footer__text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--hint);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 18px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 82%, transparent);
+  color: var(--card-bg);
+  font-size: 15px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translate(-50%, 10px);
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+  z-index: 70;
+}
+.toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+.confetti {
+  position: fixed;
+  inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 60;
+}
+
+/* =============================================================================
+ * 11. ANIMATIONS
+ * ========================================================================== */
+
+@keyframes facePop {
+  0%   { transform: scale(.84); }
+  55%  { transform: scale(1.045); }
+  100% { transform: scale(1); }
+}
+
+@keyframes auraBreathe {
+  0%, 100% { transform: scale(1);    opacity: .82; }
+  50%      { transform: scale(1.07); opacity: 1; }
+}
+
+@keyframes ringPop {
+  0%   { transform: scale(.72); opacity: .85; border-width: 3px; }
+  100% { transform: scale(1.65); opacity: 0;  border-width: 1px; }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.035); }
+}
+
+@keyframes zFloat {
+  0%   { opacity: 0; transform: translate(0, 8px) scale(.7); }
+  30%  { opacity: 1; }
+  70%  { opacity: .9; }
+  100% { opacity: 0; transform: translate(6px, -14px) scale(1.1); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(-1.4px) rotate(-1.1deg); }
+  50%      { transform: translateX(1.4px)  rotate(1.1deg); }
+}
+
+@keyframes dropFall {
+  0%   { transform: translateY(-4px) scale(.7); opacity: 0; }
+  18%  { transform: translateY(0)    scale(1);  opacity: 1; }
+  70%  { transform: translateY(30px) scale(1);  opacity: .9; }
+  100% { transform: translateY(44px) scale(.6); opacity: 0; }
+}
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-3.4deg); }
+  50%      { transform: rotate(3.4deg); }
+}
+
+@keyframes nod {
+  0%, 100% { transform: translateY(-2.5px); }
+  50%      { transform: translateY(2.5px); }
+}
+
+@keyframes glare {
+  0%, 45%   { transform: translateX(0) skewX(-18deg); }
+  75%, 100% { transform: translateX(170px) skewX(-18deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1) rotate(-1deg); }
+  50%      { transform: scale(1.035) rotate(1deg); }
+}
+
+@keyframes orbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: .45; }
+  50%      { opacity: 1; }
+}
+
+@keyframes eyeTwinkle {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50%      { transform: scale(1.14) rotate(12deg); }
+}
+
+@keyframes rainbowSweep {
+  0%, 35%   { transform: translateX(0) skewX(-20deg); }
+  80%, 100% { transform: translateX(210px) skewX(-20deg); }
+}
+
+@keyframes shimmer {
+  from { transform: translateX(-110%); }
+  to   { transform: translateX(110%); }
+}
+
+/* =============================================================================
+ * 12. GRANDS ÉCRANS (jusqu'à 1000 px) — on garde l'échelle mobile, on aère.
+ * ========================================================================== */
+
+@media (min-width: 600px) {
+  .app { max-width: 560px; padding-top: 24px; }
+  .scene { height: 176px; }
+  .scene__stage { width: 150px; height: 150px; }
+  .scene__aura { width: 244px; height: 244px; }
+  .topbar__title { font-size: 26px; }
+  .meter__level { font-size: 27px; }
+}
+
+@media (min-width: 1000px) {
+  .app { max-width: 600px; }
+}
+
+/* =============================================================================
+ * 13. MOUVEMENT RÉDUIT — toutes les animations décoratives sont coupées.
+ * ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .face.is-active { animation: none; transform: scale(1); }
+  .scene__aura { animation: none; }
+  .confetti { display: none; }
+}

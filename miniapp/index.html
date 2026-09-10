@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<!-- data-scheme est posé par app.js d'après la luminosité du thème Telegram.
+     Tant qu'il est absent, on suit prefers-color-scheme (mode navigateur). -->
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="description" content="Vérificateur de force de mot de passe — analyse 100 % locale." />
+  <title>Force du mot de passe</title>
+
+  <!-- SDK Telegram : facultatif. Hors Telegram, window.Telegram reste indéfini
+       et toute l'application continue de fonctionner à l'identique. -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+<div class="app" id="app" data-level="empty">
+
+  <!-- ===================================================================
+       1. EN-TÊTE : titre + sélecteur de langue (segmented control Telegram)
+       =================================================================== -->
+  <header class="topbar">
+    <div class="topbar__line">
+      <h1 class="topbar__title" data-i18n="app_title">Force du mot de passe</h1>
+
+      <div class="seg" id="langSwitch" role="group" data-i18n-aria-label="lang_label" aria-label="Choisir la langue">
+        <span class="seg__thumb" id="segThumb" aria-hidden="true"></span>
+        <button type="button" class="seg__btn is-active" data-lang="fr" aria-pressed="true">FR</button>
+        <button type="button" class="seg__btn" data-lang="ru" aria-pressed="false">RU</button>
+        <button type="button" class="seg__btn" data-lang="en" aria-pressed="false">EN</button>
+      </div>
+    </div>
+    <p class="topbar__subtitle" data-i18n="app_subtitle">Analyse en temps réel, directement sur votre appareil.</p>
+  </header>
+
+
+  <!-- ===================================================================
+       2. SCÈNE EMOJI ANIMÉE — le seul élément spectaculaire de l'écran
+       =================================================================== -->
+  <section class="scene" id="scene" aria-hidden="true">
+    <div class="scene__aura" id="sceneAura"></div>
+    <div class="scene__ring" id="sceneRing"></div>
+
+    <div class="scene__stage" id="sceneStage">
+
+      <!-- ---------- État VIDE : visage endormi, respiration lente ---------- -->
+      <svg class="face is-active" data-face="empty" viewBox="0 0 128 128" role="img" focusable="false">
+        <defs>
+          <radialGradient id="headEmpty" cx="38%" cy="30%" r="78%">
+            <stop offset="0%" stop-color="#B9C1CC" />
+            <stop offset="100%" stop-color="#828C99" />
+          </radialGradient>
+        </defs>
+        <g class="face__breathe">
+          <circle class="face__head" cx="64" cy="66" r="43" fill="url(#headEmpty)" />
+          <!-- yeux fermés -->
+          <path class="face__ink" d="M40 64 q9 8 18 0" />
+          <path class="face__ink" d="M70 64 q9 8 18 0" />
+          <!-- petite bouche ouverte (sommeil) -->
+          <ellipse class="face__mouthFill" cx="64" cy="88" rx="6.5" ry="5" />
+          <!-- bulle « zzz » qui monte -->
+          <g class="face__zzz">
+            <path class="face__z face__z--1" d="M92 40 h11 l-11 12 h11" />
+            <path class="face__z face__z--2" d="M100 22 h8 l-8 9 h8" />
+            <path class="face__z face__z--3" d="M107 8 h6 l-6 7 h6" />
+          </g>
+        </g>
+      </svg>
+
+      <!-- ---------- FAIBLE : visage inquiet, tremblement, goutte ---------- -->
+      <svg class="face" data-face="faible" viewBox="0 0 128 128" role="img" focusable="false">
+        <defs>
+          <radialGradient id="headWeak" cx="38%" cy="28%" r="78%">
+            <stop offset="0%" stop-color="#FFE066" />
+            <stop offset="100%" stop-color="#F2A61C" />
+          </radialGradient>
+        </defs>
+        <g class="face__shake">
+          <circle class="face__head" cx="64" cy="66" r="43" fill="url(#headWeak)" />
+          <!-- sourcils inquiets : extrémités INTERNES relevées (et non l'inverse,
+               qui donnerait un visage en colère) -->
+          <path class="face__ink" d="M38 60 l17 -8" />
+          <path class="face__ink" d="M90 60 l-17 -8" />
+          <!-- yeux écarquillés -->
+          <ellipse class="face__ink--fill" cx="48" cy="70" rx="5.5" ry="6.5" />
+          <ellipse class="face__ink--fill" cx="80" cy="70" rx="5.5" ry="6.5" />
+          <!-- bouche ondulée -->
+          <path class="face__ink" d="M46 93 q6 -8 12 0 t12 0" />
+          <!-- goutte de sueur qui tombe -->
+          <g class="face__drop">
+            <path d="M100 34 c0 0 -7 9 -7 13.5 a7 7 0 0 0 14 0 C107 43 100 34 100 34 Z" fill="#4EA8FF" />
+            <ellipse cx="97.5" cy="45" rx="1.8" ry="2.6" fill="#BFE0FF" opacity=".85" />
+          </g>
+        </g>
+      </svg>
+
+      <!-- ---------- MOYEN : visage pensif, léger balancement ---------- -->
+      <svg class="face" data-face="moyen" viewBox="0 0 128 128" role="img" focusable="false">
+        <defs>
+          <radialGradient id="headMid" cx="38%" cy="28%" r="78%">
+            <stop offset="0%" stop-color="#FFE066" />
+            <stop offset="100%" stop-color="#F2A61C" />
+          </radialGradient>
+        </defs>
+        <g class="face__sway">
+          <circle class="face__head" cx="64" cy="66" r="43" fill="url(#headMid)" />
+          <!-- un sourcil levé : l'air de réfléchir -->
+          <path class="face__ink" d="M39 50 l16 -3" />
+          <path class="face__ink" d="M73 53 l16 3" />
+          <!-- yeux -->
+          <circle class="face__ink--fill" cx="48" cy="70" r="5" />
+          <circle class="face__ink--fill" cx="80" cy="70" r="5" />
+          <!-- bouche neutre légèrement de travers -->
+          <path class="face__ink" d="M48 92 q10 -4 20 -1 t10 1" />
+        </g>
+      </svg>
+
+      <!-- ---------- FORT : lunettes de soleil + reflet balayant ---------- -->
+      <svg class="face" data-face="fort" viewBox="0 0 128 128" role="img" focusable="false">
+        <defs>
+          <radialGradient id="headStrong" cx="38%" cy="28%" r="78%">
+            <stop offset="0%" stop-color="#FFE066" />
+            <stop offset="100%" stop-color="#F2A61C" />
+          </radialGradient>
+          <clipPath id="lensClip">
+            <rect x="26" y="58" width="30" height="20" rx="8" />
+            <rect x="72" y="58" width="30" height="20" rx="8" />
+          </clipPath>
+          <linearGradient id="glare" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0" />
+            <stop offset="50%" stop-color="#FFFFFF" stop-opacity=".85" />
+            <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <g class="face__nod">
+          <circle class="face__head" cx="64" cy="66" r="43" fill="url(#headStrong)" />
+          <!-- branches des lunettes -->
+          <path d="M26 64 L18 60" stroke="#1B1B1F" stroke-width="4" stroke-linecap="round" fill="none" />
+          <path d="M102 64 L110 60" stroke="#1B1B1F" stroke-width="4" stroke-linecap="round" fill="none" />
+          <!-- verres -->
+          <rect x="26" y="58" width="30" height="20" rx="8" fill="#1B1B1F" />
+          <rect x="72" y="58" width="30" height="20" rx="8" fill="#1B1B1F" />
+          <path d="M56 64 q8 -4 16 0" stroke="#1B1B1F" stroke-width="4.5" fill="none" stroke-linecap="round" />
+          <!-- reflet qui balaye les verres -->
+          <g clip-path="url(#lensClip)">
+            <rect class="face__glare" x="-40" y="52" width="26" height="34" fill="url(#glare)" transform="skewX(-18)" />
+          </g>
+          <!-- sourire confiant -->
+          <path class="face__ink" d="M50 92 q14 12 28 -4" />
+        </g>
+      </svg>
+
+      <!-- ---------- TRÈS FORT : yeux étoilés, étoiles en orbite ---------- -->
+      <svg class="face" data-face="tres_fort" viewBox="0 0 128 128" role="img" focusable="false">
+        <defs>
+          <radialGradient id="headBest" cx="38%" cy="28%" r="78%">
+            <stop offset="0%" stop-color="#FFE066" />
+            <stop offset="100%" stop-color="#F2A61C" />
+          </radialGradient>
+          <linearGradient id="rimBest" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#A855F7" />
+            <stop offset="100%" stop-color="#3B82F6" />
+          </linearGradient>
+          <linearGradient id="rainbow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#A855F7" stop-opacity="0" />
+            <stop offset="30%"  stop-color="#A855F7" stop-opacity=".55" />
+            <stop offset="55%"  stop-color="#3B82F6" stop-opacity=".55" />
+            <stop offset="75%"  stop-color="#30D158" stop-opacity=".45" />
+            <stop offset="100%" stop-color="#30D158" stop-opacity="0" />
+          </linearGradient>
+          <clipPath id="headClip">
+            <circle cx="64" cy="66" r="43" />
+          </clipPath>
+        </defs>
+
+        <!-- étoiles en orbite autour du visage -->
+        <g class="face__orbit">
+          <g transform="translate(64 66)">
+            <g transform="translate(0 -54)"><path class="face__star face__star--a" d="M0 -8 L2.4 -2.8 L7.6 -2.5 L3.6 1.5 L4.8 6.8 L0 4 L-4.8 6.8 L-3.6 1.5 L-7.6 -2.5 L-2.4 -2.8 Z" /></g>
+            <g transform="rotate(120) translate(0 -54) rotate(-120)"><path class="face__star face__star--b" d="M0 -6 L1.8 -2.1 L5.7 -1.9 L2.7 1.1 L3.6 5.1 L0 3 L-3.6 5.1 L-2.7 1.1 L-5.7 -1.9 L-1.8 -2.1 Z" /></g>
+            <g transform="rotate(240) translate(0 -54) rotate(-240)"><path class="face__star face__star--c" d="M0 -7 L2.1 -2.4 L6.6 -2.2 L3.1 1.3 L4.2 6 L0 3.5 L-4.2 6 L-3.1 1.3 L-6.6 -2.2 L-2.1 -2.4 Z" /></g>
+          </g>
+        </g>
+
+        <g class="face__pulse">
+          <circle cx="64" cy="66" r="45.5" fill="none" stroke="url(#rimBest)" stroke-width="3.5" opacity=".95" />
+          <circle class="face__head" cx="64" cy="66" r="43" fill="url(#headBest)" />
+
+          <!-- éclat arc-en-ciel qui traverse le visage -->
+          <g clip-path="url(#headClip)">
+            <rect class="face__rainbow" x="-70" y="18" width="60" height="96" fill="url(#rainbow)" transform="skewX(-20)" />
+          </g>
+
+          <!-- yeux en étoile -->
+          <g transform="translate(48 69) scale(1.35)">
+            <path class="face__eyestar" d="M0 -8 L2.4 -2.8 L7.6 -2.5 L3.6 1.5 L4.8 6.8 L0 4 L-4.8 6.8 L-3.6 1.5 L-7.6 -2.5 L-2.4 -2.8 Z" />
+          </g>
+          <g transform="translate(80 69) scale(1.35)">
+            <path class="face__eyestar" d="M0 -8 L2.4 -2.8 L7.6 -2.5 L3.6 1.5 L4.8 6.8 L0 4 L-4.8 6.8 L-3.6 1.5 L-7.6 -2.5 L-2.4 -2.8 Z" />
+          </g>
+
+          <!-- grand sourire -->
+          <path d="M47 90 q17 18 34 0 Z" fill="#1B1B1F" />
+          <path d="M53 96 q11 8 22 0 Z" fill="#FF6B7A" />
+        </g>
+      </svg>
+
+    </div>
+
+    <!-- Conteneur optionnel pour une animation Lottie (voir app.js, section 12).
+         Reste vide et masqué si aucun fichier ./lottie/<niveau>.json n'existe. -->
+    <div class="scene__lottie" id="sceneLottie" hidden></div>
+  </section>
+
+
+  <!-- ===================================================================
+       3. CHAMP MOT DE PASSE + ACTIONS (carte façon liste Telegram)
+       =================================================================== -->
+  <section class="card" id="fieldCard">
+    <div class="field" id="field">
+      <label class="visually-hidden" for="password" data-i18n="input_label">Mot de passe</label>
+      <input
+        id="password"
+        class="field__input"
+        type="password"
+        inputmode="text"
+        autocomplete="new-password"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        data-i18n-placeholder="input_placeholder"
+        placeholder="Votre mot de passe"
+        aria-describedby="levelLive" />
+
+      <div class="field__actions">
+        <button type="button" class="iconbtn" id="toggleBtn" data-i18n-aria-label="show_password" aria-label="Afficher le mot de passe" aria-pressed="false">
+          <svg class="icon icon--eye" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+            <circle cx="12" cy="12" r="3.2" />
+            <line class="icon__slash" x1="4.5" y1="19.5" x2="19.5" y2="4.5" />
+          </svg>
+        </button>
+
+        <button type="button" class="iconbtn" id="clearBtn" data-i18n-aria-label="clear" aria-label="Effacer le champ" hidden>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="9" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <button type="button" class="row row--action" id="generateBtn">
+      <svg class="icon icon--lead" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" />
+        <circle class="dot" cx="8.5" cy="8.5" r="1.4" />
+        <circle class="dot" cx="15.5" cy="8.5" r="1.4" />
+        <circle class="dot" cx="12" cy="12" r="1.4" />
+        <circle class="dot" cx="8.5" cy="15.5" r="1.4" />
+        <circle class="dot" cx="15.5" cy="15.5" r="1.4" />
+      </svg>
+      <span class="row__label" data-i18n="generate_button">Générer un mot de passe fort</span>
+    </button>
+
+    <div class="sep"></div>
+
+    <button type="button" class="row row--action" id="copyBtn">
+      <svg class="icon icon--lead" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <rect x="8.5" y="8.5" width="12" height="12" rx="3.5" />
+        <path d="M15.5 5.5h-8a3 3 0 0 0-3 3v8" />
+      </svg>
+      <span class="row__label" id="copyLabel" data-i18n="copy_button">Copier le mot de passe</span>
+    </button>
+  </section>
+
+
+  <!-- ===================================================================
+       4-5. BARRE DE FORCE + ÉTIQUETTE DU NIVEAU + POURCENTAGE
+       =================================================================== -->
+  <section class="card card--meter">
+    <div class="meter__head">
+      <span class="meter__level" id="levelName">En attente</span>
+      <span class="meter__pct" id="levelPct">0 %</span>
+    </div>
+
+    <div class="bar" id="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <span class="bar__seg"><i class="bar__fill"></i></span>
+      <span class="bar__seg"><i class="bar__fill"></i></span>
+      <span class="bar__seg"><i class="bar__fill"></i></span>
+      <span class="bar__seg"><i class="bar__fill"></i></span>
+    </div>
+
+    <!-- Annonce lue par les lecteurs d'écran à chaque changement de niveau -->
+    <p class="meter__advice" id="levelLive" aria-live="polite">
+      Saisissez un mot de passe pour lancer l’analyse.
+    </p>
+  </section>
+
+
+  <!-- ===================================================================
+       6. CHECK-LIST DES 5 CRITÈRES
+       =================================================================== -->
+  <h2 class="section-title" data-i18n="criteria_title">Critères</h2>
+  <section class="card card--list">
+    <ul class="crits" id="crits">
+      <li class="crit" data-crit="length">
+        <span class="crit__box">
+          <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M5 12.4 L10 17.2 L19 7" />
+          </svg>
+        </span>
+        <span class="crit__label" data-i18n="crit_length">Au moins 8 caractères</span>
+        <span class="crit__value" data-crit-value>0 / 8</span>
+      </li>
+      <li class="crit" data-crit="lowercase">
+        <span class="crit__box">
+          <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
+        </span>
+        <span class="crit__label" data-i18n="crit_lowercase">Une minuscule (a-z)</span>
+      </li>
+      <li class="crit" data-crit="uppercase">
+        <span class="crit__box">
+          <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
+        </span>
+        <span class="crit__label" data-i18n="crit_uppercase">Une majuscule (A-Z)</span>
+      </li>
+      <li class="crit" data-crit="digits">
+        <span class="crit__box">
+          <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
+        </span>
+        <span class="crit__label" data-i18n="crit_digits">Un chiffre (0-9)</span>
+      </li>
+      <li class="crit" data-crit="special">
+        <span class="crit__box">
+          <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
+        </span>
+        <span class="crit__label" data-i18n="crit_special">Un caractère spécial (!@#…)</span>
+      </li>
+    </ul>
+  </section>
+
+
+  <!-- ===================================================================
+       7. BLOC « DÉTAILS » REPLIABLE
+       =================================================================== -->
+  <section class="card card--list">
+    <button type="button" class="row row--toggle" id="detailsToggle" aria-expanded="false" aria-controls="detailsPanel">
+      <span class="row__label" data-i18n="details_title">Détails</span>
+      <svg class="chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5.5 L16 12 L9 18.5" /></svg>
+    </button>
+
+    <div class="collapse" id="detailsPanel">
+      <div class="collapse__inner">
+        <div class="sep"></div>
+
+        <div class="row row--data">
+          <span class="row__label" data-i18n="types_count">Types de caractères</span>
+          <span class="row__value" id="dTypes">0 / 4</span>
+        </div>
+        <div class="sep"></div>
+
+        <div class="row row--data">
+          <span class="row__label" data-i18n="length_label">Longueur</span>
+          <span class="row__value" id="dLength">0</span>
+        </div>
+        <div class="sep"></div>
+
+        <div class="row row--data">
+          <span class="row__label">
+            <span data-i18n="entropy_label">Entropie</span>
+            <span class="badge" data-i18n="bonus_badge">bonus</span>
+          </span>
+          <span class="row__value" id="dEntropy">—</span>
+        </div>
+        <div class="sep"></div>
+
+        <div class="row row--data">
+          <span class="row__label">
+            <span data-i18n="crack_time_label">Temps de cassage estimé</span>
+            <span class="badge" data-i18n="bonus_badge">bonus</span>
+          </span>
+          <span class="row__value" id="dCrack">—</span>
+        </div>
+
+        <!-- Avertissements bonus : injectés en textContent uniquement -->
+        <div class="warns" id="warns"></div>
+
+        <div class="sep"></div>
+        <p class="tip" id="nextHint">Saisissez un mot de passe pour lancer l’analyse.</p>
+        <p class="tip tip--muted" data-i18n="bonus_note">Les lignes marquées « bonus » vont au-delà du cahier des charges.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ===================================================================
+       8. PIED DE PAGE — confidentialité
+       =================================================================== -->
+  <footer class="footer">
+    <svg class="footer__lock" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="4.5" y="10.5" width="15" height="10" rx="3.2" />
+      <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+    </svg>
+    <p class="footer__text" data-i18n="privacy_note">
+      Analyse 100 % locale — votre mot de passe ne quitte jamais votre appareil.
+    </p>
+  </footer>
+
+</div>
+
+<!-- 9. Confettis (dessinés en canvas, sans aucune dépendance) -->
+<canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
+
+<!-- Petit toast « Copié » -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
