@@ -1,0 +1,10 @@
+{
+  "name": "password-checker-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Bot Telegram de verification de la force d'un mot de passe — zero dependance npm",
+  "scripts": {
+    "start": "node bot.js"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "password-checker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Vérificateur de force de mot de passe — Mini App Telegram + bot (projet étudiant)",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "bot": "node bot/bot.js",
+    "serve": "python3 -m http.server 8080 --directory miniapp"
+  },
+  "license": "MIT"
+}
