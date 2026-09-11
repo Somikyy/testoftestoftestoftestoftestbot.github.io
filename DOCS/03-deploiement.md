@@ -118,4 +118,5 @@ npx localtunnel --port 8080
 - [ ] Бот отвечает на `/start`, `/aide`, `/regles`, `/generer`
 - [ ] `bot/.env` **не** в git (`git ls-files | grep env` → только `.env.example`)
 - [ ] Токен не виден ни в коде, ни в отчёте, ни на скриншотах
-- [ ] Проверил все 4 уровня: `abc` → Faible, `abcdef12` → Moyen, `Abcdef123456` → Fort, `Abcdef123456!@#$` → Très fort
+- [ ] Проверил все 4 уровня:
+      `abc` → **Faible** · `chatvert1` → **Moyen** · `Chat-Vert-42` → **Fort** · `Chat-Vert-42-Lune!` → **Très fort**

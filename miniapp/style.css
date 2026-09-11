@@ -29,12 +29,17 @@
   --hint: var(--tg-theme-hint-color);
   --accent: var(--tg-theme-button-color);
   --accent-ink: var(--tg-theme-link-color);
+  --separator: rgba(128, 128, 128, .30);
   --separator: color-mix(in srgb, var(--hint) 30%, transparent);
+  --card-edge: rgba(128, 128, 128, .14);
   --card-edge: color-mix(in srgb, var(--hint) 14%, transparent);
+  --press: rgba(128, 128, 128, .16);
   --press: color-mix(in srgb, var(--hint) 16%, transparent);
 
   /* Palette des niveaux — teinte « graphique » + teinte « encre » (texte) */
-  --c-empty: #8e8e93;      --c-empty-ink: #6d6d72;
+  /* Teinte bleu-ardoise plutôt que gris neutre : sur fond sombre, l'aura de
+     l'écran d'accueil reste visible et la scène ne paraît pas éteinte. */
+  --c-empty: #8aa4c8;      --c-empty-ink: #6d6d72;
   --c-faible: #ff453a;     --c-faible-ink: #c9271d;
   --c-moyen: #ff9f0a;      --c-moyen-ink: #a86200;
   --c-fort: #30d158;       --c-fort-ink: #1a8b3c;
@@ -73,7 +78,9 @@
   --c-moyen-ink: #ffb340;
   --c-fort-ink: #4ade7d;
   --c-tres-ink: #c084fc;
+  --separator: rgba(140, 140, 145, .34);
   --separator: color-mix(in srgb, var(--hint) 34%, transparent);
+  --card-edge: rgba(140, 140, 145, .20);
   --card-edge: color-mix(in srgb, var(--hint) 20%, transparent);
 }
 
@@ -168,6 +175,7 @@ button {
   display: flex;
   padding: 2px;
   border-radius: 9px;
+  background: rgba(128, 128, 128, .20);
   background: color-mix(in srgb, var(--hint) 20%, transparent);
   flex: none;
 }
@@ -216,6 +224,7 @@ button {
   position: absolute;
   width: 210px; height: 210px;
   border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, var(--level) 0%, transparent 66%);
   background: radial-gradient(circle at 50% 50%,
               color-mix(in srgb, var(--level) 46%, transparent) 0%,
               color-mix(in srgb, var(--level-2) 20%, transparent) 42%,
@@ -390,6 +399,7 @@ button {
 .badge {
   padding: 2px 7px;
   border-radius: 6px;
+  background: rgba(62, 136, 247, .15);
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent-ink);
   font-size: 11px;
@@ -412,7 +422,7 @@ button {
 }
 
 .field.is-filled { border-left-color: var(--level); }
-.field.is-focused { background: color-mix(in srgb, var(--level) 6%, transparent); }
+.field.is-focused { background: rgba(128, 128, 128, .06); background: color-mix(in srgb, var(--level) 6%, transparent); }
 
 .field__input {
   flex: 1;
@@ -501,6 +511,7 @@ button {
   flex: 1;
   height: 7px;
   border-radius: 4px;
+  background: rgba(128, 128, 128, .24);
   background: color-mix(in srgb, var(--hint) 24%, transparent);
   overflow: hidden;
 }
@@ -549,7 +560,7 @@ button {
 .crit.is-ok { color: var(--text); }
 
 /* Ligne qui s'illumine brièvement quand le critère devient valide. */
-.crit.is-lit { background: color-mix(in srgb, var(--level) 12%, transparent); }
+.crit.is-lit { background: rgba(128, 128, 128, .12); background: color-mix(in srgb, var(--level) 12%, transparent); }
 
 .crit__box {
   position: relative;
@@ -677,6 +688,7 @@ button {
   bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   padding: 10px 18px;
   border-radius: 12px;
+  background: var(--text);
   background: color-mix(in srgb, var(--text) 82%, transparent);
   color: var(--card-bg);
   font-size: 15px;
@@ -818,4 +830,129 @@ button {
   .face.is-active { animation: none; transform: scale(1); }
   .scene__aura { animation: none; }
   .confetti { display: none; }
+}
+
+/* =============================================================================
+ * 14. AJOUTS ISSUS DE LA REVUE DU JURY
+ *     (accessibilité, lisibilité pour le correcteur, confort grand écran)
+ * ========================================================================== */
+
+/* --- Contenu réservé aux lecteurs d'écran ---------------------------------
+   Invisible à l'œil, mais bien lu à voix haute. On n'utilise PAS display:none,
+   qui retirerait le texte de l'arbre d'accessibilité. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Regroupement titre + liste ------------------------------------------
+   `display: contents` fait disparaître ce conteneur de la mise en page :
+   sur mobile, l'écran est rigoureusement identique à avant. Il ne redevient
+   un vrai bloc qu'en deux colonnes (voir la media query plus bas). */
+.colgroup { display: contents; }
+
+/* --- Titre de section + pastille compteur « 3 / 5 » ----------------------- */
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-head .section-title { flex: 1; min-width: 0; }
+
+.pill {
+  flex: none;
+  margin-right: 16px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+.pill--count {
+  background: rgba(128, 128, 128, .16);
+  background: color-mix(in srgb, var(--hint) 16%, transparent);
+  color: var(--hint);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+/* Les 5 critères sont remplis : la pastille passe à la couleur du niveau. */
+.pill--count.is-full {
+  background: rgba(48, 209, 88, .18);
+  background: color-mix(in srgb, var(--level) 18%, transparent);
+  color: var(--level-ink);
+}
+
+/* --- État positif « aucune faiblesse détectée » --------------------------- */
+.warn--ok { color: var(--hint); }
+.warn--ok::before {
+  content: "✓";
+  background: rgba(48, 209, 88, .22);
+  background: color-mix(in srgb, var(--c-fort) 22%, transparent);
+  color: var(--c-fort-ink);
+  font-size: 12px;
+}
+
+/* --- Balayage iridescent, réservé au niveau « Très fort » -----------------
+   Petit luxe visuel qui récompense le meilleur niveau. */
+.card--meter { position: relative; overflow: hidden; }
+.card--meter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(115deg,
+              transparent 35%,
+              rgba(255, 255, 255, .16) 48%,
+              rgba(168, 85, 247, .10) 55%,
+              transparent 68%);
+  transition: opacity var(--dur-slow) var(--ease);
+}
+.app[data-level="tres_fort"] .card--meter::after {
+  opacity: 1;
+  animation: cardSheen 3.4s ease-in-out infinite;
+}
+@keyframes cardSheen {
+  0%, 100% { transform: translateX(-40%); }
+  50%      { transform: translateX(40%); }
+}
+
+/* --- Grand écran : deux colonnes plutôt qu'une bande étroite -------------- */
+@media (min-width: 760px) {
+  .app {
+    max-width: 860px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    column-gap: 20px;
+  }
+
+  /* Placement EXPLICITE en lignes ET en colonnes : l'placement automatique
+     laissait la colonne de droite flotter sous la colonne de gauche. */
+  .app > *      { grid-column: 1 / -1; }      /* par défaut : pleine largeur */
+  #fieldCard    { grid-column: 1; grid-row: 3; }
+  .card--meter  { grid-column: 1; grid-row: 4; }
+  /* Le titre et sa liste montent ensemble, alignés sur le haut de la saisie. */
+  .colgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    grid-column: 2;
+    grid-row: 3 / span 2;
+  }
+}
+@media (min-width: 1000px) {
+  .app { max-width: 900px; }
+}
+
+/* --- Mouvement réduit : le balayage est décoratif, on le coupe ------------ */
+@media (prefers-reduced-motion: reduce) {
+  .card--meter::after { animation: none; opacity: 0; }
 }

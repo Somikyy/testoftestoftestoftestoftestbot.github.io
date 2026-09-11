@@ -64,12 +64,18 @@ export const STRINGS = {
     copy_failed: 'Copie impossible',
 
     // Check-list des critères
-    criteria_title: 'Critères',
-    crit_length: 'Au moins 8 caractères',
+    // {min} vient de CONFIG.MIN_LENGTH_CRITERION : changer le seuil dans
+    // strength.js met automatiquement l'écran à jour.
+    criteria_title: 'Critères du cahier des charges',
+    crit_length: 'Au moins {min} caractères',
     crit_lowercase: 'Une minuscule (a-z)',
     crit_uppercase: 'Une majuscule (A-Z)',
     crit_digits: 'Un chiffre (0-9)',
     crit_special: 'Un caractère spécial (!@#…)',
+    crit_ok: 'validé',
+    crit_todo: 'à faire',
+    // Annonce vocale rejouée à chaque frappe (aria-live).
+    announce: 'Niveau : {level}, {percent} %.',
 
     // Bloc « Détails »
     details_title: 'Détails',
@@ -86,6 +92,7 @@ export const STRINGS = {
     warn_common: 'Ce mot de passe figure parmi les plus courants.',
     warn_repetition: 'Répétitions détectées (aaaa, abcabc…).',
     warn_sequence: 'Suite détectée (1234, azerty…).',
+    no_warnings: 'Aucune faiblesse évidente détectée.',
 
     // Conseil « niveau suivant »
     next_level_hint: 'Pour atteindre « {level} » : {needs}',
@@ -94,7 +101,8 @@ export const STRINGS = {
     next_level_done: 'Niveau maximal atteint.',
 
     // Unités
-    unit_bits: '{n} bit|{n} bits',
+    // {n} choisit la forme plurielle, {value} porte le nombre déjà formaté.
+    unit_bits: '{value} bit|{value} bits',
     unit_chars: '{n} caractère|{n} caractères',
     value_over: 'plus de {n}',
 
@@ -141,12 +149,15 @@ export const STRINGS = {
     copied: 'Скопировано',
     copy_failed: 'Не удалось скопировать',
 
-    criteria_title: 'Критерии',
-    crit_length: 'Не менее 8 символов',
+    criteria_title: 'Критерии из техзадания',
+    crit_length: 'Не менее {min} символов',
     crit_lowercase: 'Строчная буква (a-z)',
     crit_uppercase: 'Заглавная буква (A-Z)',
     crit_digits: 'Цифра (0-9)',
     crit_special: 'Спецсимвол (!@#…)',
+    crit_ok: 'выполнено',
+    crit_todo: 'не выполнено',
+    announce: 'Уровень: {level}, {percent} %.',
 
     details_title: 'Подробности',
     details_open: 'Показать подробности',
@@ -161,13 +172,14 @@ export const STRINGS = {
     warn_common: 'Этот пароль входит в список самых частых.',
     warn_repetition: 'Обнаружены повторы (aaaa, abcabc…).',
     warn_sequence: 'Обнаружена последовательность (1234, йцукен…).',
+    no_warnings: 'Явных слабостей не обнаружено.',
 
     next_level_hint: 'До уровня «{level}»: {needs}',
     next_need_chars: '+{n} символ|+{n} символа|+{n} символов',
     next_need_types: '+{n} тип символов|+{n} типа символов|+{n} типов символов',
     next_level_done: 'Достигнут максимальный уровень.',
 
-    unit_bits: '{n} бит|{n} бита|{n} бит',
+    unit_bits: '{value} бит|{value} бита|{value} бит',
     unit_chars: '{n} символ|{n} символа|{n} символов',
     value_over: 'более {n}',
 
@@ -213,12 +225,15 @@ export const STRINGS = {
     copied: 'Copied',
     copy_failed: 'Copy failed',
 
-    criteria_title: 'Criteria',
-    crit_length: 'At least 8 characters',
+    criteria_title: 'Specification criteria',
+    crit_length: 'At least {min} characters',
     crit_lowercase: 'A lowercase letter (a-z)',
     crit_uppercase: 'An uppercase letter (A-Z)',
     crit_digits: 'A digit (0-9)',
     crit_special: 'A special character (!@#…)',
+    crit_ok: 'met',
+    crit_todo: 'not met',
+    announce: 'Level: {level}, {percent}%.',
 
     details_title: 'Details',
     details_open: 'Show details',
@@ -233,13 +248,15 @@ export const STRINGS = {
     warn_common: 'This password is among the most common ones.',
     warn_repetition: 'Repetitions detected (aaaa, abcabc…).',
     warn_sequence: 'Sequence detected (1234, qwerty…).',
+    no_warnings: 'No obvious weakness detected.',
 
     next_level_hint: 'To reach “{level}”: {needs}',
     next_need_chars: '+{n} character|+{n} characters',
     next_need_types: '+{n} character type|+{n} character types',
     next_level_done: 'Maximum level reached.',
 
-    unit_bits: '{n} bit|{n} bits',
+    // {n} choisit la forme plurielle, {value} porte le nombre déjà formaté.
+    unit_bits: '{value} bit|{value} bits',
     unit_chars: '{n} character|{n} characters',
     value_over: 'over {n}',
 

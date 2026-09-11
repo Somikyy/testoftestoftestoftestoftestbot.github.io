@@ -12,7 +12,10 @@
  * =============================================================================
  */
 
-import { analyzePassword, generateStrongPassword, COMMON_PASSWORDS } from './strength.js';
+// CONFIG est importé pour que l'écran suive TOUJOURS les règles du moteur :
+// changer MIN_LENGTH_CRITERION dans strength.js met à jour le libellé « Au moins
+// N caractères » et le compteur « 12 / N » sans toucher à ce fichier.
+import { analyzePassword, generateStrongPassword, COMMON_PASSWORDS, CONFIG } from './strength.js';
 import { LANGS, DEFAULT_LANG, t, getLang, setLang, detectLang, onLangChange, formatNumber } from './i18n.js';
 
 /* =============================================================================
@@ -90,6 +93,7 @@ const dom = {
   bar: document.getElementById('bar'),
   barFills: Array.from(document.querySelectorAll('.bar__fill')),
   crits: Array.from(document.querySelectorAll('.crit')),
+  critsCount: document.getElementById('critsCount'),
   detailsToggle: document.getElementById('detailsToggle'),
   detailsPanel: document.getElementById('detailsPanel'),
   dTypes: document.getElementById('dTypes'),
@@ -192,8 +196,12 @@ function haptic(kind) {
 function applyTranslations() {
   document.documentElement.lang = getLang();
 
+  // Variables disponibles pour TOUTES les chaînes de l'écran. `t()` ignore
+  // celles qu'une chaîne n'utilise pas, donc on peut les passer partout.
+  const vars = { min: CONFIG.MIN_LENGTH_CRITERION };
+
   document.querySelectorAll('[data-i18n]').forEach((element) => {
-    element.textContent = t(element.dataset.i18n);
+    element.textContent = t(element.dataset.i18n, vars);
   });
   document.querySelectorAll('[data-i18n-placeholder]').forEach((element) => {
     element.setAttribute('placeholder', t(element.dataset.i18nPlaceholder));
@@ -331,9 +339,13 @@ function animateCounter(target) {
  * Le critère « length » affiche en plus « 12 / 8 ».
  */
 function renderCriteria(result) {
+  let validated = 0;
+
   result.criteria.forEach((criterion) => {
     const row = dom.crits.find((item) => item.dataset.crit === criterion.id);
     if (!row) return;
+
+    if (criterion.ok) validated += 1;
 
     const wasOk = row.classList.contains('is-ok');
     row.classList.toggle('is-ok', criterion.ok);
@@ -344,9 +356,22 @@ function renderCriteria(result) {
       setTimeout(() => row.classList.remove('is-lit'), 620);
     }
 
+    // Le seuil vient du moteur, jamais d'une valeur écrite en dur.
     const valueSlot = row.querySelector('[data-crit-value]');
-    if (valueSlot) valueSlot.textContent = `${criterion.value ?? 0} / 8`;
+    if (valueSlot) {
+      valueSlot.textContent = `${criterion.value ?? 0} / ${CONFIG.MIN_LENGTH_CRITERION}`;
+    }
+
+    // Statut réservé aux lecteurs d'écran : la coche seule ne se lit pas.
+    const statusSlot = row.querySelector('[data-crit-status]');
+    if (statusSlot) statusSlot.textContent = t(criterion.ok ? 'crit_ok' : 'crit_todo');
   });
+
+  // Pastille « 3 / 5 » à côté du titre de la section.
+  if (dom.critsCount) {
+    dom.critsCount.textContent = `${validated} / ${result.criteria.length}`;
+    dom.critsCount.classList.toggle('is-full', validated === result.criteria.length);
+  }
 }
 
 /* =============================================================================
@@ -390,11 +415,10 @@ function renderDetails(result) {
   } else {
     // L'entropie est arrondie à l'entier : la décimale du moteur n'apporte rien
     // à l'écran, et l'entier choisit correctement la forme plurielle.
+    // Le nombre est formaté AVANT d'entrer dans t() : `n` sert au pluriel,
+    // `value` porte le texte affiché (espace fine des milliers en français).
     const bits = Math.round(result.bonus.entropyBits);
-    dom.dEntropy.textContent = t('unit_bits', { n: bits }).replace(
-      String(bits),
-      formatNumber(bits)
-    );
+    dom.dEntropy.textContent = t('unit_bits', { n: bits, value: formatNumber(bits) });
     dom.dCrack.textContent = formatCrackTime(result.bonus.crackTimeSeconds);
   }
 
@@ -414,6 +438,24 @@ function renderWarnings(result) {
   if (result.bonus.isCommon) warnings.push({ key: 'warn_common', danger: true });
   if (result.bonus.hasRepetition) warnings.push({ key: 'warn_repetition', danger: false });
   if (result.bonus.hasSequence) warnings.push({ key: 'warn_sequence', danger: false });
+
+  // Aucune alerte : on l'affirme, plutôt que de laisser un vide ambigu.
+  if (warnings.length === 0) {
+    const row = document.createElement('p');
+    row.className = 'warn warn--ok';
+
+    const text = document.createElement('span');
+    text.textContent = t('no_warnings');
+    row.appendChild(text);
+
+    const badge = document.createElement('span');
+    badge.className = 'badge warn__badge';
+    badge.textContent = t('bonus_badge');
+    row.appendChild(badge);
+
+    dom.warns.appendChild(row);
+    return;
+  }
 
   for (const warning of warnings) {
     const row = document.createElement('p');
@@ -563,9 +605,14 @@ function analyzeAndRender() {
   renderCriteria(result);
   renderDetails(result);
 
-  // Étiquette + annonce accessible
-  dom.levelName.textContent = result.isEmpty ? t('level_empty') : t(`level_${result.level}`);
-  dom.levelLive.textContent = result.isEmpty ? t('advice_empty') : t(`advice_${result.level}`);
+  // Étiquette + annonce accessible.
+  // L'annonce inclut le POURCENTAGE : sans lui, le texte resterait identique
+  // tant que le niveau ne change pas et le lecteur d'écran ne dirait plus rien.
+  const levelText = result.isEmpty ? t('level_empty') : t(`level_${result.level}`);
+  dom.levelName.textContent = levelText;
+  dom.levelLive.textContent = result.isEmpty
+    ? t('advice_empty')
+    : `${t('announce', { level: levelText, percent: result.score })} ${t(`advice_${result.level}`)}`;
 
   // Bordure colorée du champ + bouton « effacer »
   dom.field.classList.toggle('is-filled', !result.isEmpty);
@@ -676,7 +723,13 @@ function syncMainButton() {
       });
     }
     button.show();
-  } catch { /* MainButton indisponible : les lignes de la carte suffisent */ }
+    // Le MainButton de Telegram fait déjà le travail : on retire la ligne
+    // « Générer » de la carte pour ne pas proposer deux fois la même action.
+    if (dom.generateBtn) dom.generateBtn.hidden = true;
+  } catch {
+    // MainButton indisponible : la ligne de la carte reprend son rôle.
+    if (dom.generateBtn) dom.generateBtn.hidden = false;
+  }
 }
 
 /* =============================================================================

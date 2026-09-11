@@ -4,7 +4,8 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <!-- maximum-scale=5 : le zoom au pincement doit rester possible (WCAG 1.4.4). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5" />
   <meta name="color-scheme" content="light dark" />
   <meta name="description" content="Vérificateur de force de mot de passe — analyse 100 % locale." />
   <title>Force du mot de passe</title>
@@ -306,8 +307,16 @@
   <!-- ===================================================================
        6. CHECK-LIST DES 5 CRITÈRES
        =================================================================== -->
-  <h2 class="section-title" data-i18n="criteria_title">Critères</h2>
-  <section class="card card--list">
+  <!-- Le titre et sa liste forment UN SEUL bloc : sur grand écran ils doivent
+       rester ensemble dans la même colonne. Sur mobile, `display: contents`
+       fait disparaître ce conteneur : la mise en page ne change pas d'un pixel. -->
+  <div class="colgroup" id="critsGroup">
+  <div class="section-head">
+    <h2 class="section-title" data-i18n="criteria_title">Critères du cahier des charges</h2>
+    <!-- Combien de critères sont déjà validés. Mis à jour à chaque frappe. -->
+    <span class="pill pill--count" id="critsCount" aria-hidden="true">0 / 5</span>
+  </div>
+  <section class="card card--list" id="critsCard">
     <ul class="crits" id="crits">
       <li class="crit" data-crit="length">
         <span class="crit__box">
@@ -317,39 +326,46 @@
         </span>
         <span class="crit__label" data-i18n="crit_length">Au moins 8 caractères</span>
         <span class="crit__value" data-crit-value>0 / 8</span>
+        <!-- Lu par les lecteurs d'écran : « validé » / « à faire ». -->
+        <span class="sr-only" data-crit-status></span>
       </li>
       <li class="crit" data-crit="lowercase">
         <span class="crit__box">
           <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
         </span>
         <span class="crit__label" data-i18n="crit_lowercase">Une minuscule (a-z)</span>
+        <span class="sr-only" data-crit-status></span>
       </li>
       <li class="crit" data-crit="uppercase">
         <span class="crit__box">
           <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
         </span>
         <span class="crit__label" data-i18n="crit_uppercase">Une majuscule (A-Z)</span>
+        <span class="sr-only" data-crit-status></span>
       </li>
       <li class="crit" data-crit="digits">
         <span class="crit__box">
           <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
         </span>
         <span class="crit__label" data-i18n="crit_digits">Un chiffre (0-9)</span>
+        <span class="sr-only" data-crit-status></span>
       </li>
       <li class="crit" data-crit="special">
         <span class="crit__box">
           <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
         </span>
         <span class="crit__label" data-i18n="crit_special">Un caractère spécial (!@#…)</span>
+        <span class="sr-only" data-crit-status></span>
       </li>
     </ul>
   </section>
+  </div><!-- /.colgroup -->
 
 
   <!-- ===================================================================
        7. BLOC « DÉTAILS » REPLIABLE
        =================================================================== -->
-  <section class="card card--list">
+  <section class="card card--list" id="detailsCard">
     <button type="button" class="row row--toggle" id="detailsToggle" aria-expanded="false" aria-controls="detailsPanel">
       <span class="row__label" data-i18n="details_title">Détails</span>
       <svg class="chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5.5 L16 12 L9 18.5" /></svg>
