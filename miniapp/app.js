@@ -7,15 +7,20 @@
  *  brancher le moteur sur l'interface.
  *
  *  RÈGLE ABSOLUE : le mot de passe ne quitte jamais la page.
- *  Aucun fetch, aucun stockage, aucun envoi vers Telegram. Seule la LANGUE
- *  choisie est mémorisée.
+ *  Aucun fetch, aucun envoi vers Telegram. Seuls la LANGUE choisie et les
+ *  RÉGLAGES DES CRITÈRES sont mémorisés — jamais le mot de passe.
  * =============================================================================
  */
 
-// CONFIG est importé pour que l'écran suive TOUJOURS les règles du moteur :
-// changer MIN_LENGTH_CRITERION dans strength.js met à jour le libellé « Au moins
-// N caractères » et le compteur « 12 / N » sans toucher à ce fichier.
-import { analyzePassword, generateStrongPassword, COMMON_PASSWORDS, CONFIG } from './strength.js';
+// Le moteur est la SEULE source de vérité : l'écran construit ses lignes à
+// partir de CONFIG.CRITERIA et n'écrit jamais un critère en dur. Les fonctions
+// setCriterion/setLevelGap/resetCriteria sont celles que l'éditeur appelle ;
+// elles recalculent aussitôt les paliers (voir strength.js, section 1 bis).
+import {
+  analyzePassword, generateStrongPassword, COMMON_PASSWORDS, CONFIG,
+  findCriterion, setCriterion, setLevelGap, resetCriteria, isDefaultCriteria,
+  exportSettings, importSettings,
+} from './strength.js';
 import { LANGS, DEFAULT_LANG, t, getLang, setLang, detectLang, onLangChange, formatNumber } from './i18n.js';
 
 /* =============================================================================
@@ -47,8 +52,9 @@ const UI_CONFIG = {
   lottieCdn: 'https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie_light.min.js',
 };
 
-/** Clé de stockage — LANGUE UNIQUEMENT, jamais le mot de passe. */
+/** Clés de stockage — préférences d'affichage UNIQUEMENT, jamais le mot de passe. */
 const LANG_STORAGE_KEY = 'pwd_checker_lang';
+const CRITERIA_STORAGE_KEY = 'pwd_checker_criteria';
 
 /** Le SDK Telegram est facultatif : hors Telegram, `tg` vaut undefined. */
 const tg = window.Telegram?.WebApp;
@@ -92,8 +98,18 @@ const dom = {
   levelLive: document.getElementById('levelLive'),
   bar: document.getElementById('bar'),
   barFills: Array.from(document.querySelectorAll('.bar__fill')),
-  crits: Array.from(document.querySelectorAll('.crit')),
+  critsGroup: document.getElementById('critsGroup'),
+  crits: document.getElementById('crits'),
+  critRows: new Map(),           // rempli par buildCriteriaRows()
+  critsTitle: document.getElementById('critsTitle'),
   critsCount: document.getElementById('critsCount'),
+  critsEdit: document.getElementById('critsEdit'),
+  critsEditor: document.getElementById('critsEditor'),
+  critsReset: document.getElementById('critsReset'),
+  critsNote: document.getElementById('critsNote'),
+  gapStepper: document.getElementById('gapStepper'),
+  gapValue: document.getElementById('gapValue'),
+  levelsRecap: document.getElementById('levelsRecap'),
   detailsToggle: document.getElementById('detailsToggle'),
   detailsPanel: document.getElementById('detailsPanel'),
   dTypes: document.getElementById('dTypes'),
@@ -225,29 +241,36 @@ function highlightLang(lang) {
   });
 }
 
-/** Mémorise la langue : CloudStorage si disponible, sinon localStorage. */
-function persistLang(lang) {
+/**
+ * Mémorise une préférence : CloudStorage si disponible, sinon localStorage.
+ * Sert à la langue ET aux réglages des critères — jamais au mot de passe.
+ */
+function persistSetting(key, value) {
   try {
     if (inTelegram && tg.CloudStorage && supportsVersion('6.9')) {
-      tg.CloudStorage.setItem(LANG_STORAGE_KEY, lang, () => {});
+      tg.CloudStorage.setItem(key, value, () => {});
       return;
     }
   } catch { /* on bascule sur le repli */ }
-  try { localStorage.setItem(LANG_STORAGE_KEY, lang); } catch { /* mode privé */ }
+  try { localStorage.setItem(key, value); } catch { /* mode privé */ }
 }
 
-/** Relit la langue mémorisée (asynchrone côté CloudStorage). */
-function restoreLang(callback) {
+/**
+ * Relit une préférence mémorisée. `callback` peut être appelé DEUX fois :
+ * une première de façon synchrone (localStorage), une seconde quand
+ * CloudStorage répond. À lui de valider la valeur reçue.
+ */
+function restoreSetting(key, callback) {
   // 1) Repli local, immédiat.
   let stored = null;
-  try { stored = localStorage.getItem(LANG_STORAGE_KEY); } catch { /* mode privé */ }
-  if (stored && LANGS.includes(stored)) callback(stored);
+  try { stored = localStorage.getItem(key); } catch { /* mode privé */ }
+  if (stored) callback(stored);
 
   // 2) CloudStorage : la préférence suit l'utilisateur d'un appareil à l'autre.
   try {
     if (inTelegram && tg.CloudStorage && supportsVersion('6.9')) {
-      tg.CloudStorage.getItem(LANG_STORAGE_KEY, (error, value) => {
-        if (!error && value && LANGS.includes(value)) callback(value);
+      tg.CloudStorage.getItem(key, (error, value) => {
+        if (!error && value) callback(value);
       });
     }
   } catch { /* indisponible : on garde le repli */ }
@@ -256,7 +279,7 @@ function restoreLang(callback) {
 /** Change de langue, redessine tout et mémorise le choix. */
 function changeLang(lang) {
   if (!setLang(lang)) { highlightLang(getLang()); return; }
-  persistLang(getLang());
+  persistSetting(LANG_STORAGE_KEY, getLang());
 }
 
 /* =============================================================================
@@ -331,47 +354,288 @@ function animateCounter(target) {
 }
 
 /* =============================================================================
- * 6. CHECK-LIST DES CRITÈRES
+ * 6. CHECK-LIST DES CRITÈRES — CONSTRUITE À PARTIR DU MOTEUR
+ * -----------------------------------------------------------------------------
+ *  Aucune ligne n'est écrite dans index.html : elles sont toutes fabriquées
+ *  ici à partir de `CONFIG.CRITERIA`. Ajouter un critère au moteur suffit donc
+ *  pour le voir apparaître, avec sa coche, son interrupteur et son réglage.
  * ========================================================================== */
 
+/** Coche SVG d'une ligne de critère (même tracé que le reste de l'écran). */
+function buildCheckIcon() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'crit__check');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', 'M5 12.4 L10 17.2 L19 7');
+  svg.appendChild(path);
+  return svg;
+}
+
+/** Bouton « − » / « + » d'un réglage numérique. */
+function buildStepperButton(step, ariaKey) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'stepper__btn';
+  button.dataset.step = String(step);
+  button.dataset.i18nAriaLabel = ariaKey;
+  button.setAttribute('aria-label', t(ariaKey));
+  button.textContent = step < 0 ? '−' : '+';
+  return button;
+}
+
+/** Réglage « − 8 + » du seuil de longueur, affiché en mode édition. */
+function buildStepper(criterion) {
+  const stepper = document.createElement('span');
+  stepper.className = 'stepper';
+  stepper.appendChild(buildStepperButton(-1, 'crit_less'));
+
+  const value = document.createElement('span');
+  value.className = 'stepper__value';
+  value.setAttribute('data-crit-min', '');
+  value.textContent = String(criterion.min);
+  stepper.appendChild(value);
+
+  stepper.appendChild(buildStepperButton(1, 'crit_more'));
+  return stepper;
+}
+
 /**
- * Coche/décoche les 5 critères du cahier des charges.
- * Le critère « length » affiche en plus « 12 / 8 ».
+ * Interrupteur d'activation du critère.
+ * `role="switch"` + `aria-checked` : les lecteurs d'écran annoncent l'état,
+ * et `aria-labelledby` le fait nommer par le libellé de sa propre ligne.
+ */
+function buildSwitch(criterion, labelId) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'switch';
+  button.setAttribute('role', 'switch');
+  button.setAttribute('aria-checked', criterion.enabled ? 'true' : 'false');
+  button.setAttribute('aria-labelledby', labelId);
+  button.dataset.toggle = criterion.id;
+  const knob = document.createElement('span');
+  knob.className = 'switch__knob';
+  button.appendChild(knob);
+  return button;
+}
+
+/** Fabrique une ligne de critère complète. / Собирает строку критерия. */
+function buildCriterionRow(criterion) {
+  const row = document.createElement('li');
+  row.className = 'crit';
+  row.dataset.crit = criterion.id;
+
+  const box = document.createElement('span');
+  box.className = 'crit__box';
+  box.appendChild(buildCheckIcon());
+  row.appendChild(box);
+
+  // Le libellé porte `data-i18n` : applyTranslations() le traduit comme les
+  // autres, et la variable {min} y injecte le seuil courant.
+  const labelId = `critLabel_${criterion.id}`;
+  const label = document.createElement('span');
+  label.className = 'crit__label';
+  label.id = labelId;
+  label.dataset.i18n = `crit_${criterion.id}`;
+  row.appendChild(label);
+
+  // Critère hors cahier des charges : on le dit, comme dans le bloc Détails.
+  if (criterion.bonus) {
+    const badge = document.createElement('span');
+    badge.className = 'badge crit__badge';
+    badge.dataset.i18n = 'bonus_badge';
+    row.appendChild(badge);
+  }
+
+  // « 12 / 8 » : réservé au critère de longueur.
+  if (criterion.kind === 'length') {
+    const value = document.createElement('span');
+    value.className = 'crit__value';
+    value.setAttribute('data-crit-value', '');
+    row.appendChild(value);
+  }
+
+  // Commandes d'édition : masquées (donc hors tabulation) hors mode édition.
+  const edit = document.createElement('span');
+  edit.className = 'crit__edit';
+  if (criterion.kind === 'length') edit.appendChild(buildStepper(criterion));
+  edit.appendChild(buildSwitch(criterion, labelId));
+  row.appendChild(edit);
+
+  // Statut réservé aux lecteurs d'écran : la coche seule ne se lit pas.
+  const status = document.createElement('span');
+  status.className = 'sr-only';
+  status.setAttribute('data-crit-status', '');
+  row.appendChild(status);
+
+  return row;
+}
+
+/** (Re)construit toute la liste depuis le moteur. / Пересобирает список. */
+function buildCriteriaRows() {
+  dom.crits.textContent = '';
+  dom.critRows.clear();
+
+  for (const criterion of CONFIG.CRITERIA) {
+    const row = buildCriterionRow(criterion);
+    dom.crits.appendChild(row);
+    dom.critRows.set(criterion.id, row);
+  }
+}
+
+/**
+ * Coche/décoche les critères et met à jour la pastille « 3 / 5 ».
+ * Les critères désactivés restent dans le DOM (l'éditeur en a besoin) mais
+ * sortent du décompte, et le CSS les masque tant qu'on n'édite pas.
  */
 function renderCriteria(result) {
   let validated = 0;
+  let active = 0;
 
-  result.criteria.forEach((criterion) => {
-    const row = dom.crits.find((item) => item.dataset.crit === criterion.id);
+  result.allCriteria.forEach((criterion) => {
+    const row = dom.critRows.get(criterion.id);
     if (!row) return;
 
-    if (criterion.ok) validated += 1;
+    row.classList.toggle('is-off', !criterion.enabled);
+
+    const ok = criterion.enabled && criterion.ok;
+    if (criterion.enabled) {
+      active += 1;
+      if (criterion.ok) validated += 1;
+    }
 
     const wasOk = row.classList.contains('is-ok');
-    row.classList.toggle('is-ok', criterion.ok);
+    row.classList.toggle('is-ok', ok);
 
     // Petite illumination de la ligne au moment où le critère devient valide.
-    if (criterion.ok && !wasOk && !reducedMotion.matches) {
+    if (ok && !wasOk && !reducedMotion.matches) {
       row.classList.add('is-lit');
       setTimeout(() => row.classList.remove('is-lit'), 620);
     }
 
-    // Le seuil vient du moteur, jamais d'une valeur écrite en dur.
+    // Le seuil vient du critère lui-même, jamais d'une valeur écrite en dur.
     const valueSlot = row.querySelector('[data-crit-value]');
     if (valueSlot) {
-      valueSlot.textContent = `${criterion.value ?? 0} / ${CONFIG.MIN_LENGTH_CRITERION}`;
+      valueSlot.textContent = `${criterion.value ?? 0} / ${criterion.min ?? 0}`;
     }
 
-    // Statut réservé aux lecteurs d'écran : la coche seule ne se lit pas.
     const statusSlot = row.querySelector('[data-crit-status]');
-    if (statusSlot) statusSlot.textContent = t(criterion.ok ? 'crit_ok' : 'crit_todo');
+    if (statusSlot) {
+      statusSlot.textContent = !criterion.enabled
+        ? t('crit_off')
+        : t(criterion.ok ? 'crit_ok' : 'crit_todo');
+    }
   });
 
-  // Pastille « 3 / 5 » à côté du titre de la section.
+  // Pastille « 3 / 5 » à côté du titre : le total suit le nombre de critères
+  // réellement actifs, pas un 5 figé.
   if (dom.critsCount) {
-    dom.critsCount.textContent = `${validated} / ${result.criteria.length}`;
-    dom.critsCount.classList.toggle('is-full', validated === result.criteria.length);
+    dom.critsCount.textContent = `${validated} / ${active}`;
+    dom.critsCount.classList.toggle('is-full', active > 0 && validated === active);
   }
+}
+
+/* =============================================================================
+ * 6 bis. ÉDITEUR DE CRITÈRES — les lignes deviennent réglables
+ * ========================================================================== */
+
+/** Le barème des 4 paliers, recalculé à chaque réglage. */
+function renderLevelsRecap() {
+  dom.levelsRecap.textContent = '';
+
+  // Du plus faible au plus fort : c'est l'ordre de lecture naturel.
+  for (const level of [...CONFIG.LEVELS].sort((a, b) => a.index - b.index)) {
+    const name = document.createElement('dt');
+    name.className = 'levels__name';
+    name.dataset.level = level.id;
+    name.textContent = t(`level_${level.id}`);
+
+    const rule = document.createElement('dd');
+    rule.className = 'levels__rule';
+    rule.textContent = level.minLength === 0 && level.minTypes === 0
+      ? t('settings_rule_none')
+      : t('settings_rule', { len: formatNumber(level.minLength), types: level.minTypes });
+
+    dom.levelsRecap.append(name, rule);
+  }
+}
+
+/** Remet l'éditeur en phase avec le moteur (interrupteurs, seuils, barème). */
+function syncEditor() {
+  for (const criterion of CONFIG.CRITERIA) {
+    const row = dom.critRows.get(criterion.id);
+    if (!row) continue;
+
+    const toggle = row.querySelector('.switch');
+    if (toggle) toggle.setAttribute('aria-checked', criterion.enabled ? 'true' : 'false');
+
+    const minSlot = row.querySelector('[data-crit-min]');
+    if (minSlot) minSlot.textContent = formatNumber(criterion.min);
+
+    // Bornes atteintes : le bouton correspondant est désactivé, pas silencieux.
+    row.querySelectorAll('.stepper__btn').forEach((button) => {
+      const target = criterion.min + Number(button.dataset.step);
+      button.disabled = target < (criterion.minAllowed ?? 0)
+                     || target > (criterion.maxAllowed ?? 64);
+    });
+  }
+
+  dom.gapValue.textContent = formatNumber(CONFIG.LEVEL_GAP);
+  dom.gapStepper.querySelectorAll('.stepper__btn').forEach((button) => {
+    const target = CONFIG.LEVEL_GAP + Number(button.dataset.step);
+    button.disabled = target < 1 || target > 8;
+  });
+
+  renderLevelsRecap();
+
+  // Le titre et la note disent clairement si l'on est encore sur le barème
+  // officiel ou sur un barème personnalisé.
+  const custom = !isDefaultCriteria();
+  dom.critsTitle.dataset.i18n = custom ? 'criteria_title_custom' : 'criteria_title';
+  dom.critsTitle.textContent = t(dom.critsTitle.dataset.i18n);
+  dom.critsNote.dataset.i18n = custom ? 'settings_custom_note' : 'settings_default_note';
+  dom.critsNote.textContent = t(dom.critsNote.dataset.i18n);
+  dom.critsGroup.classList.toggle('is-custom', custom);
+  dom.critsReset.disabled = !custom;
+}
+
+/** Ouvre/ferme le mode édition. / Открывает и закрывает режим правки. */
+function toggleEditor(force) {
+  const open = force ?? dom.critsEdit.getAttribute('aria-expanded') !== 'true';
+  dom.critsEdit.setAttribute('aria-expanded', open ? 'true' : 'false');
+  dom.critsEdit.dataset.i18n = open ? 'edit_done' : 'edit_criteria';
+  dom.critsEdit.textContent = t(dom.critsEdit.dataset.i18n);
+  dom.crits.classList.toggle('is-editing', open);
+  dom.critsEditor.hidden = !open;
+  haptic('light');
+}
+
+/**
+ * Un réglage vient de changer : on mémorise, on retraduit (les libellés
+ * contiennent {min}), on remet l'éditeur en phase et on ré-analyse.
+ */
+function applySettingsChange() {
+  persistSetting(CRITERIA_STORAGE_KEY, JSON.stringify(exportSettings()));
+  applyTranslations();
+  syncEditor();
+  analyzeAndRender();
+}
+
+/** Recharge les réglages mémorisés (tolérant à tout contenu corrompu). */
+function restoreCriteria() {
+  restoreSetting(CRITERIA_STORAGE_KEY, (raw) => {
+    try {
+      importSettings(JSON.parse(raw));
+    } catch {
+      return; // valeur illisible : on garde les critères du cahier des charges
+    }
+    applyTranslations();
+    syncEditor();
+    analyzeAndRender();
+  });
 }
 
 /* =============================================================================
@@ -435,6 +699,10 @@ function renderWarnings(result) {
   if (result.isEmpty) return;
 
   const warnings = [];
+  // Un critère « interdit » activé dans l'éditeur a réellement coûté un niveau.
+  if (result.bonus.penalizedLevels > 0) {
+    warnings.push({ key: 'penalty_note', danger: true, vars: { n: result.bonus.penalizedLevels } });
+  }
   if (result.bonus.isCommon) warnings.push({ key: 'warn_common', danger: true });
   if (result.bonus.hasRepetition) warnings.push({ key: 'warn_repetition', danger: false });
   if (result.bonus.hasSequence) warnings.push({ key: 'warn_sequence', danger: false });
@@ -462,7 +730,7 @@ function renderWarnings(result) {
     row.className = warning.danger ? 'warn warn--danger' : 'warn';
 
     const text = document.createElement('span');
-    text.textContent = t(warning.key);
+    text.textContent = t(warning.key, warning.vars || {});
     row.appendChild(text);
 
     const badge = document.createElement('span');
@@ -799,6 +1067,48 @@ function bindEvents() {
   dom.copyBtn.addEventListener('click', handleCopy);
   dom.detailsToggle.addEventListener('click', toggleDetails);
 
+  // --- Éditeur de critères (délégation : les lignes sont créées par JS) ---
+  dom.critsEdit.addEventListener('click', () => toggleEditor());
+
+  dom.crits.addEventListener('click', (event) => {
+    // Interrupteur : on active / désactive le critère.
+    const toggle = event.target.closest('.switch');
+    if (toggle) {
+      setCriterion(toggle.dataset.toggle, {
+        enabled: toggle.getAttribute('aria-checked') !== 'true',
+      });
+      haptic('light');
+      applySettingsChange();
+      return;
+    }
+
+    // « − » / « + » : on déplace le seuil de longueur d'un cran.
+    const step = event.target.closest('.stepper__btn');
+    if (!step) return;
+    const row = step.closest('.crit');
+    const criterion = findCriterion(row?.dataset.crit);
+    if (!criterion) return;
+    setCriterion(criterion.id, { min: criterion.min + Number(step.dataset.step) });
+    haptic('light');
+    applySettingsChange();
+  });
+
+  // Écart entre les paliers : même mécanique, appliquée au barème entier.
+  dom.gapStepper.addEventListener('click', (event) => {
+    const step = event.target.closest('.stepper__btn');
+    if (!step) return;
+    setLevelGap(CONFIG.LEVEL_GAP + Number(step.dataset.step));
+    haptic('light');
+    applySettingsChange();
+  });
+
+  dom.critsReset.addEventListener('click', () => {
+    resetCriteria();
+    haptic('medium');
+    showToast(t('settings_restored'));
+    applySettingsChange();
+  });
+
   // Sélecteur de langue (délégation d'événement).
   dom.langSwitch.addEventListener('click', (event) => {
     const button = event.target.closest('.seg__btn');
@@ -811,6 +1121,7 @@ function bindEvents() {
   onLangChange((lang) => {
     highlightLang(lang);
     applyTranslations();
+    syncEditor();            // barème et libellés de l'éditeur sont créés en JS
     analyzeAndRender();
   });
 
@@ -855,6 +1166,9 @@ function init() {
   // Le panneau « Détails » démarre replié : on le sort de la tabulation.
   dom.detailsPanel.setAttribute('inert', '');
 
+  // La check-list est fabriquée à partir du moteur AVANT tout affichage.
+  buildCriteriaRows();
+
   // Les écouteurs d'abord : ainsi tout changement de langue déclenché plus bas
   // repasse par onLangChange et redessine l'écran entier.
   bindEvents();
@@ -865,12 +1179,17 @@ function init() {
     : DEFAULT_LANG;
   setLang(suggested);
 
+  // Réglages mémorisés des critères : lus AVANT le premier rendu pour que
+  // l'écran n'affiche jamais le barème par défaut puis celui de l'utilisateur.
+  restoreCriteria();
+
   highlightLang(getLang());
   applyTranslations();
+  syncEditor();
   analyzeAndRender();
 
   // La préférence enregistrée arrive en dernier (CloudStorage est asynchrone).
-  restoreLang((lang) => { setLang(lang); });
+  restoreSetting(LANG_STORAGE_KEY, (lang) => { if (LANGS.includes(lang)) setLang(lang); });
 }
 
 init();

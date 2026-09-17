@@ -312,52 +312,59 @@
        fait disparaître ce conteneur : la mise en page ne change pas d'un pixel. -->
   <div class="colgroup" id="critsGroup">
   <div class="section-head">
-    <h2 class="section-title" data-i18n="criteria_title">Critères du cahier des charges</h2>
+    <h2 class="section-title" id="critsTitle" data-i18n="criteria_title">Critères du cahier des charges</h2>
     <!-- Combien de critères sont déjà validés. Mis à jour à chaque frappe. -->
     <span class="pill pill--count" id="critsCount" aria-hidden="true">0 / 5</span>
+    <!-- Ouvre l'éditeur : chaque ligne devient réglable. -->
+    <button type="button" class="linkbtn" id="critsEdit"
+            aria-expanded="false" aria-controls="critsCard"
+            data-i18n="edit_criteria">Modifier</button>
   </div>
   <section class="card card--list" id="critsCard">
-    <ul class="crits" id="crits">
-      <li class="crit" data-crit="length">
-        <span class="crit__box">
-          <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M5 12.4 L10 17.2 L19 7" />
-          </svg>
+
+    <!-- Les lignes NE SONT PLUS ÉCRITES ICI : app.js les construit à partir de
+         CONFIG.CRITERIA (voir strength.js). Ajouter un critère au moteur suffit
+         donc à le faire apparaître, sans toucher à ce fichier.
+         RU: строки строятся из CONFIG.CRITERIA, HTML править не нужно. -->
+    <ul class="crits" id="crits"></ul>
+
+    <!-- ---- Éditeur : replié tant qu'on n'a pas cliqué sur « Modifier » ---- -->
+    <div class="editor" id="critsEditor" hidden>
+      <div class="sep"></div>
+      <p class="tip tip--muted" data-i18n="edit_hint">
+        Activez, désactivez ou ajustez les critères : le barème se recalcule.
+      </p>
+
+      <div class="sep"></div>
+      <div class="row row--data">
+        <span class="row__label" data-i18n="settings_gap">Écart entre les niveaux</span>
+        <span class="stepper" id="gapStepper">
+          <button type="button" class="stepper__btn" data-step="-1"
+                  data-i18n-aria-label="settings_gap_less" aria-label="Diminuer l’écart">−</button>
+          <span class="stepper__value" id="gapValue">4</span>
+          <button type="button" class="stepper__btn" data-step="1"
+                  data-i18n-aria-label="settings_gap_more" aria-label="Augmenter l’écart">+</button>
         </span>
-        <span class="crit__label" data-i18n="crit_length">Au moins 8 caractères</span>
-        <span class="crit__value" data-crit-value>0 / 8</span>
-        <!-- Lu par les lecteurs d'écran : « validé » / « à faire ». -->
-        <span class="sr-only" data-crit-status></span>
-      </li>
-      <li class="crit" data-crit="lowercase">
-        <span class="crit__box">
-          <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
-        </span>
-        <span class="crit__label" data-i18n="crit_lowercase">Une minuscule (a-z)</span>
-        <span class="sr-only" data-crit-status></span>
-      </li>
-      <li class="crit" data-crit="uppercase">
-        <span class="crit__box">
-          <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
-        </span>
-        <span class="crit__label" data-i18n="crit_uppercase">Une majuscule (A-Z)</span>
-        <span class="sr-only" data-crit-status></span>
-      </li>
-      <li class="crit" data-crit="digits">
-        <span class="crit__box">
-          <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
-        </span>
-        <span class="crit__label" data-i18n="crit_digits">Un chiffre (0-9)</span>
-        <span class="sr-only" data-crit-status></span>
-      </li>
-      <li class="crit" data-crit="special">
-        <span class="crit__box">
-          <svg class="crit__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.4 L10 17.2 L19 7" /></svg>
-        </span>
-        <span class="crit__label" data-i18n="crit_special">Un caractère spécial (!@#…)</span>
-        <span class="sr-only" data-crit-status></span>
-      </li>
-    </ul>
+      </div>
+
+      <div class="sep"></div>
+      <h3 class="editor__title" data-i18n="settings_levels">Barème recalculé</h3>
+      <!-- Rempli par app.js : les 4 paliers, recalculés à chaque réglage. -->
+      <dl class="levels" id="levelsRecap" aria-live="polite"></dl>
+
+      <div class="sep"></div>
+      <button type="button" class="row row--action" id="critsReset">
+        <svg class="icon icon--lead" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5" />
+          <path d="M4 4v4.5h4.5" />
+        </svg>
+        <span class="row__label" data-i18n="settings_reset">Rétablir le cahier des charges</span>
+      </button>
+
+      <p class="tip" id="critsNote" data-i18n="settings_default_note">
+        Réglages d’origine : barème exact du cahier des charges.
+      </p>
+    </div>
   </section>
   </div><!-- /.colgroup -->
 

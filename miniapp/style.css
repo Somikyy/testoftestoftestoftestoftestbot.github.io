@@ -604,6 +604,152 @@ button {
 }
 .crit.is-ok .crit__value { color: var(--level-ink); font-weight: 600; }
 
+/* --- Critère hors cahier des charges : badge « bonus » dans la ligne ------- */
+.crit__badge { flex: none; }
+
+/* =============================================================================
+ * 8 bis. ÉDITEUR DE CRITÈRES
+ * -----------------------------------------------------------------------------
+ *  Hors mode édition, les commandes n'existent pas visuellement : `display:none`
+ *  les retire aussi de l'ordre de tabulation, sans `inert` ni `tabindex`.
+ * ========================================================================== */
+
+/* Bouton « Modifier » / « Terminé », dans le titre de section. */
+.linkbtn {
+  flex: none;
+  margin-right: 16px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.linkbtn:active { background: var(--press); }
+/* La pastille n'est plus la dernière de la ligne : le bouton porte la marge. */
+.section-head .pill--count { margin-right: 0; }
+.linkbtn[aria-expanded="true"] { color: var(--accent-ink); text-decoration: underline; }
+
+/* Les commandes d'une ligne : stepper + interrupteur. */
+.crit__edit {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.crits.is-editing .crit__edit { display: flex; }
+/* En édition, le compteur « 12 / 8 » cède la place au réglage du seuil. */
+.crits.is-editing .crit__value { display: none; }
+
+/* Critère désactivé : invisible en lecture, estompé en édition. */
+.crit.is-off { display: none; }
+.crits.is-editing .crit.is-off { display: flex; opacity: .55; }
+.crits.is-editing .crit.is-off .crit__box { border-style: dashed; }
+
+/* --- Réglage numérique « − 8 + » ------------------------------------------ */
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 2px;
+  border-radius: 9px;
+  background: rgba(128, 128, 128, .14);
+  background: color-mix(in srgb, var(--hint) 14%, transparent);
+}
+.stepper__btn {
+  width: 30px; height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--accent-ink);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+}
+.stepper__btn:active { background: var(--card-bg); }
+.stepper__btn:disabled { opacity: .35; cursor: default; }
+.stepper__value {
+  min-width: 26px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* --- Interrupteur d'activation (role="switch") ----------------------------- */
+.switch {
+  position: relative;
+  width: 50px; height: 30px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, .30);
+  background: color-mix(in srgb, var(--hint) 30%, transparent);
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+}
+.switch[aria-checked="true"] { background: var(--c-fort); }
+.switch__knob {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+  transition: transform var(--dur) var(--ease);
+}
+.switch[aria-checked="true"] .switch__knob { transform: translateX(20px); }
+
+/* --- Panneau de réglages avancés ------------------------------------------ */
+/* Cette note ne suit pas un autre paragraphe : elle reprend sa marge haute. */
+.editor .tip--muted { padding-top: 12px; }
+
+.editor__title {
+  margin: 12px 0 2px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--hint);
+}
+
+/* Barème recalculé : deux colonnes « niveau / règle ». */
+.levels {
+  margin: 0;
+  padding: 4px 16px 12px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 15px;
+}
+.levels__name { font-weight: 600; }
+.levels__name[data-level="faible"]    { color: var(--c-faible-ink); }
+.levels__name[data-level="moyen"]     { color: var(--c-moyen-ink); }
+.levels__name[data-level="fort"]      { color: var(--c-fort-ink); }
+.levels__name[data-level="tres_fort"] { color: var(--c-tres-ink); }
+.levels__rule {
+  margin: 0;
+  text-align: right;
+  color: var(--hint);
+  font-variant-numeric: tabular-nums;
+}
+
+.row--action:disabled { opacity: .4; cursor: default; }
+.row--action:disabled:active { background: transparent; }
+
+/* Barème personnalisé : la pastille du compteur le signale discrètement. */
+.colgroup.is-custom .pill--count { box-shadow: 0 0 0 1.5px var(--accent-ink) inset; }
+
 /* =============================================================================
  * 9. BLOC DÉTAILS REPLIABLE
  * ========================================================================== */
