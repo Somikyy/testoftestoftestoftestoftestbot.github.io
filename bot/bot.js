@@ -47,6 +47,7 @@ import { fileURLToPath } from 'node:url';
 import {
   analyzePassword,
   generateStrongPassword,
+  activeTypeIds,
   CONFIG,
   COMMON_PASSWORDS,
 } from '../miniapp/strength.js';
@@ -206,14 +207,30 @@ const LEVEL_LABELS = {
   tres_fort: { emoji: '🟢', nom: 'Très fort' },
 };
 
-/** Libellés français des critères affichés. / Подписи критериев. */
+/**
+ * Libellés français des critères. / Подписи критериев.
+ *
+ * FR : Les critères vivent dans CONFIG.CRITERIA (voir strength.js) : le bot ne
+ *      connaît QUE leurs libellés, jamais leur nombre ni leurs seuils. Activer
+ *      un critère dans le moteur le fait donc apparaître ici tout seul.
+ * RU : Сами критерии лежат в CONFIG.CRITERIA — бот знает только подписи.
+ */
 const CRITERIA_LABELS = {
-  length:    `Au moins ${CONFIG.MIN_LENGTH_CRITERION} caractères`,
-  lowercase: 'Une lettre minuscule (a-z)',
-  uppercase: 'Une lettre majuscule (A-Z)',
-  digits:    'Un chiffre (0-9)',
-  special:   'Un caractère spécial (!@#$…)',
+  length:        'Au moins {min} caractères',
+  lowercase:     'Une lettre minuscule (a-z)',
+  uppercase:     'Une lettre majuscule (A-Z)',
+  digits:        'Un chiffre (0-9)',
+  special:       'Un caractère spécial (!@#$…)',
+  no_repetition: 'Aucune répétition (aaaa, abcabc…)',
+  no_sequence:   'Aucune suite (1234, azerty…)',
+  not_common:    'Absent des mots de passe courants',
 };
+
+/** Libellé d'un critère, seuil courant inclus. / Подпись критерия с порогом. */
+function libelleCritere(critere) {
+  const modele = CRITERIA_LABELS[critere.id] || critere.id;
+  return modele.replace('{min}', String(critere.min ?? CONFIG.MIN_LENGTH_CRITERION));
+}
 
 /**
  * Barre de progression en blocs pleins / vides.
@@ -477,14 +494,15 @@ function rendreAnalyse(resultat) {
   lignes.push(`<code>${progressBar(resultat.score)}</code> ${resultat.score}/100`);
   lignes.push('');
   lignes.push(`Longueur : <b>${resultat.length}</b> caractère${resultat.length > 1 ? 's' : ''} · ` +
-              `Types utilisés : <b>${resultat.typesCount}/4</b>`);
+              // Le dénominateur suit les types RÉELLEMENT exigés par le moteur.
+              `Types utilisés : <b>${resultat.typesCount}/${activeTypeIds().length}</b>`);
   lignes.push('');
 
   // --- Liste des critères ----------------------------------------------------
   lignes.push('<b>Critères</b>');
   for (const critere of resultat.criteria) {
     const icone = critere.ok ? '✅' : '❌';
-    lignes.push(`${icone} ${CRITERIA_LABELS[critere.id] || critere.id}`);
+    lignes.push(`${icone} ${libelleCritere(critere)}`);
   }
 
   // --- Conseil pour atteindre le niveau suivant ------------------------------

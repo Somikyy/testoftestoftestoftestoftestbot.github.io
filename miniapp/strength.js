@@ -19,32 +19,121 @@
 
 /* =============================================================================
  * 1. CONFIG — ЕДИНСТВЕННОЕ МЕСТО, ГДЕ НУЖНО ЧТО-ТО МЕНЯТЬ
+ * -----------------------------------------------------------------------------
+ *  FR : Les critères ne sont PLUS écrits en dur, ni ici ni dans le HTML. Ils
+ *       vivent tous dans `CONFIG.CRITERIA`, une simple liste de descriptions.
+ *       L'écran construit ses lignes à partir de cette liste, et les paliers
+ *       (Faible / Moyen / Fort / Très fort) en sont DÉDUITS. Modifier un
+ *       critère met donc à jour la check-list ET la notation.
+ *  RU : Критерии больше не зашиты — ни здесь, ни в HTML. Все они в
+ *       CONFIG.CRITERIA. Интерфейс строит строки из этого списка, а уровни
+ *       ВЫВОДЯТСЯ из него: меняешь критерий — меняется и чек-лист, и оценка.
  * ============================================================================= */
+
+/**
+ * FR : Les paliers du cahier des charges, exprimés RELATIVEMENT au critère de
+ *      longueur. Avec les réglages par défaut (longueur minimale = 8, écart
+ *      entre paliers = 4) on retrouve EXACTEMENT le barème demandé :
+ *      Moyen >= 8 car. / 2 types, Fort >= 12 / 3, Très fort >= 16 / 4.
+ * RU : Уровни заданы ОТНОСИТЕЛЬНО критерия длины. При значениях по умолчанию
+ *      (мин. длина 8, шаг 4) получается ровно ТЗ: 8/2, 12/3, 16/4.
+ *
+ *  lengthSteps = nombre d'écarts ajoutés à la longueur minimale (null = aucune)
+ *  minTypes    = types exigés, plafonné au nombre de types réellement actifs
+ */
+const LEVEL_SPEC = [
+  { id: 'tres_fort', index: 3, lengthSteps: 2,    minTypes: 4 },
+  { id: 'fort',      index: 2, lengthSteps: 1,    minTypes: 3 },
+  { id: 'moyen',     index: 1, lengthSteps: 0,    minTypes: 2 },
+  { id: 'faible',    index: 0, lengthSteps: null, minTypes: 0 },
+];
+
+/**
+ * FR : Les critères livrés par défaut — la check-list du cahier des charges.
+ *      Cette liste est la RÉFÉRENCE IMMUABLE : `resetCriteria()` y revient.
+ * RU : Критерии по умолчанию — чек-лист из ТЗ. Это эталон, к которому
+ *      возвращает resetCriteria().
+ *
+ *  kind: 'length' — seuil numérique réglable (`min`), borné par min/maxAllowed
+ *  kind: 'type'   — exige un type de caractère ; compte pour la classification
+ *  kind: 'forbid' — interdit un défaut ; son échec fait PERDRE des niveaux
+ *
+ *  enabled: false = critère proposé mais désactivé (invisible tant qu'on
+ *  n'ouvre pas l'éditeur). Les trois derniers sont des bonus hors cahier
+ *  des charges : les activer, c'est sortir du barème demandé.
+ */
+const DEFAULT_CRITERIA = [
+  { id: 'length',        kind: 'length', enabled: true,  min: 8, minAllowed: 4, maxAllowed: 32 },
+  { id: 'lowercase',     kind: 'type',   enabled: true,  type: 'lowercase' },
+  { id: 'uppercase',     kind: 'type',   enabled: true,  type: 'uppercase' },
+  { id: 'digits',        kind: 'type',   enabled: true,  type: 'digits' },
+  { id: 'special',       kind: 'type',   enabled: true,  type: 'special' },
+  { id: 'no_repetition', kind: 'forbid', enabled: false, check: 'repetition', bonus: true },
+  { id: 'no_sequence',   kind: 'forbid', enabled: false, check: 'sequence',   bonus: true },
+  { id: 'not_common',    kind: 'forbid', enabled: false, check: 'common',     bonus: true },
+];
+
+/** Copie profonde d'un descripteur de critère. / Глубокая копия критерия. */
+const cloneCriterion = (criterion) => ({ ...criterion });
+
+/**
+ * Cache des paliers calculés.
+ * FR : `CONFIG.LEVELS` doit renvoyer TOUJOURS LE MÊME tableau tant que les
+ *      réglages ne bougent pas — sinon `classify()` renverrait des objets que
+ *      `CONFIG.LEVELS.includes(...)` ne reconnaîtrait plus.
+ * RU : CONFIG.LEVELS должен возвращать ОДИН И ТОТ ЖЕ массив, пока настройки не
+ *      менялись, иначе сравнение по ссылке перестанет работать.
+ */
+let levelsCache = [];
+let levelsSignature = null;
 
 export const CONFIG = {
   /**
-   * FR : Les 4 niveaux du cahier des charges, du plus fort au plus faible.
-   *      L'évaluation se fait DE HAUT EN BAS : le premier niveau dont toutes
-   *      les conditions sont remplies gagne.
-   * RU : 4 уровня из ТЗ, от сильного к слабому. Проверка идёт СВЕРХУ ВНИЗ:
-   *      побеждает первый уровень, все условия которого выполнены.
-   *
-   *  minLength = longueur minimale (en points de code Unicode)
-   *  minTypes  = nombre minimal de types de caractères parmi les 4
+   * FR : LA liste des critères. Tout part d'ici : la check-list affichée, le
+   *      nombre de types exigés, et les seuils de longueur des paliers.
+   * RU : ГЛАВНЫЙ список критериев. Отсюда берётся всё: чек-лист, количество
+   *      требуемых типов и пороги длины для уровней.
    */
-  LEVELS: [
-    { id: 'tres_fort', index: 3, minLength: 16, minTypes: 4 }, // Très fort
-    { id: 'fort',      index: 2, minLength: 12, minTypes: 3 }, // Fort
-    { id: 'moyen',     index: 1, minLength: 8,  minTypes: 2 }, // Moyen
-    { id: 'faible',    index: 0, minLength: 0,  minTypes: 0 }, // Faible (par défaut)
-  ],
+  CRITERIA: DEFAULT_CRITERIA.map(cloneCriterion),
 
   /**
-   * FR : Longueur minimale affichée dans la liste des critères (cahier des
-   *      charges : « Longueur minimale (ex. : >= 8 caractères) »).
-   * RU : Минимальная длина, показываемая в чек-листе критериев.
+   * FR : Écart de longueur entre deux paliers consécutifs.
+   *      8 (minimum) -> Moyen 8, Fort 8+4=12, Très fort 8+8=16.
+   * RU : Шаг длины между уровнями. 8 -> 8 / 12 / 16.
    */
-  MIN_LENGTH_CRITERION: 8,
+  LEVEL_GAP: 4,
+
+  /**
+   * FR : Nombre de niveaux perdus par critère « interdit » (kind: 'forbid')
+   *      non respecté. 0 = les critères interdits restent purement indicatifs.
+   * RU : Сколько уровней теряется за каждый нарушенный «запрещающий» критерий.
+   */
+  FORBID_PENALTY: 1,
+
+  /**
+   * FR : Les 4 paliers, RECALCULÉS à partir des critères actifs.
+   *      Lecture seule : pour changer les seuils, on change les critères
+   *      (`setCriterion('length', { min: 10 })`) ou `LEVEL_GAP`.
+   * RU : 4 уровня, ПЕРЕСЧИТАННЫЕ из активных критериев. Только для чтения.
+   */
+  get LEVELS() {
+    refreshLevels();
+    return levelsCache;
+  },
+
+  /**
+   * FR : Raccourci historique vers le seuil du critère de longueur.
+   *      Lire ET écrire restent possibles : `CONFIG.MIN_LENGTH_CRITERION = 10`
+   *      revient à `setCriterion('length', { min: 10 })`.
+   * RU : Историческое сокращение для порога длины: читается и пишется.
+   */
+  get MIN_LENGTH_CRITERION() {
+    const criterion = findCriterion('length');
+    return criterion ? criterion.min : 0;
+  },
+  set MIN_LENGTH_CRITERION(value) {
+    setCriterion('length', { min: value });
+  },
 
   /**
    * FR : Le cahier des charges liste « Aucun caractère spécial » comme un
@@ -84,6 +173,145 @@ export const CONFIG = {
    */
   GUESSES_PER_SECOND: 1e10,
 };
+
+/* =============================================================================
+ * 1 bis. CRITÈRES DYNAMIQUES — lecture, écriture, remise à zéro
+ *        Динамические критерии: чтение, запись, сброс
+ * ============================================================================= */
+
+/** Descripteur d'un critère, par identifiant. / Критерий по идентификатору. */
+export function findCriterion(id) {
+  return CONFIG.CRITERIA.find((criterion) => criterion.id === id) || null;
+}
+
+/** Copie des critères — sûre à manipuler (l'écran ne modifie jamais l'original). */
+export function getCriteria() {
+  return CONFIG.CRITERIA.map(cloneCriterion);
+}
+
+/** Identifiants des types de caractères RÉELLEMENT exigés (0 à 4). */
+export function activeTypeIds() {
+  return CONFIG.CRITERIA
+    .filter((criterion) => criterion.kind === 'type' && criterion.enabled)
+    .map((criterion) => criterion.type);
+}
+
+/** Borne une valeur de seuil dans les limites déclarées par le critère. */
+function clampMin(criterion, value) {
+  const wanted = Math.round(Number(value));
+  if (!Number.isFinite(wanted)) return criterion.min;
+  const low = criterion.minAllowed ?? 0;
+  const high = criterion.maxAllowed ?? 64;
+  return Math.max(low, Math.min(high, wanted));
+}
+
+/**
+ * FR : Modifie un critère. C'est LE point d'entrée utilisé par l'éditeur de
+ *      l'interface. Renvoie le critère mis à jour, ou `null` s'il n'existe pas.
+ * RU : Меняет критерий — единственная точка входа для редактора в интерфейсе.
+ *
+ * @param {string} id
+ * @param {{enabled?: boolean, min?: number}} patch
+ */
+export function setCriterion(id, patch = {}) {
+  const criterion = findCriterion(id);
+  if (!criterion) return null;
+
+  if (typeof patch.enabled === 'boolean') criterion.enabled = patch.enabled;
+  if (patch.min !== undefined && criterion.kind === 'length') {
+    criterion.min = clampMin(criterion, patch.min);
+  }
+  return criterion;
+}
+
+/** Écart de longueur entre deux paliers (1 à 8). / Шаг длины между уровнями. */
+export function setLevelGap(value) {
+  const wanted = Math.round(Number(value));
+  if (Number.isFinite(wanted)) CONFIG.LEVEL_GAP = Math.max(1, Math.min(8, wanted));
+  return CONFIG.LEVEL_GAP;
+}
+
+/** Retour aux critères du cahier des charges. / Возврат к критериям из ТЗ. */
+export function resetCriteria() {
+  CONFIG.CRITERIA = DEFAULT_CRITERIA.map(cloneCriterion);
+  CONFIG.LEVEL_GAP = 4;
+  return getCriteria();
+}
+
+/** Les réglages sont-ils ceux du cahier des charges ? / Настройки — как в ТЗ? */
+export function isDefaultCriteria() {
+  if (CONFIG.LEVEL_GAP !== 4) return false;
+  return DEFAULT_CRITERIA.every((reference) => {
+    const criterion = findCriterion(reference.id);
+    if (!criterion) return false;
+    if (criterion.enabled !== reference.enabled) return false;
+    return reference.kind !== 'length' || criterion.min === reference.min;
+  });
+}
+
+/**
+ * FR : Réglages sous une forme minimale, prête à être mémorisée (JSON).
+ *      On n'enregistre QUE ce qui est réglable — jamais de mot de passe.
+ * RU : Настройки в минимальной форме для сохранения. Пароли — никогда.
+ */
+export function exportSettings() {
+  const criteria = {};
+  for (const criterion of CONFIG.CRITERIA) {
+    criteria[criterion.id] = criterion.kind === 'length'
+      ? { enabled: criterion.enabled, min: criterion.min }
+      : { enabled: criterion.enabled };
+  }
+  return { gap: CONFIG.LEVEL_GAP, criteria };
+}
+
+/**
+ * FR : Recharge des réglages mémorisés. Tolérant : une clé inconnue, une
+ *      valeur absurde ou un objet corrompu sont ignorés sans rien casser.
+ * RU : Загружает сохранённые настройки. Всё непонятное молча игнорируется.
+ */
+export function importSettings(settings) {
+  if (!settings || typeof settings !== 'object') return getCriteria();
+
+  if (settings.gap !== undefined) setLevelGap(settings.gap);
+
+  const criteria = settings.criteria;
+  if (criteria && typeof criteria === 'object') {
+    for (const [id, patch] of Object.entries(criteria)) {
+      if (patch && typeof patch === 'object') setCriterion(id, patch);
+    }
+  }
+  return getCriteria();
+}
+
+/**
+ * FR : Recalcule les 4 paliers à partir des critères actifs — mais seulement
+ *      si quelque chose a réellement changé (voir `levelsCache`).
+ * RU : Пересчитывает 4 уровня из активных критериев — только если что-то
+ *      действительно изменилось.
+ */
+function refreshLevels() {
+  const lengthCriterion = findCriterion('length');
+  // Critère de longueur désactivé => la longueur ne compte PLUS NULLE PART,
+  // exactement comme un type qu'on décoche. Tous les seuils tombent à 0.
+  const withLength = Boolean(lengthCriterion && lengthCriterion.enabled);
+  const base = withLength ? lengthCriterion.min : 0;
+  const types = activeTypeIds();
+  const signature = `${withLength}|${base}|${CONFIG.LEVEL_GAP}|${types.join(',')}`;
+
+  if (signature === levelsSignature) return levelsCache;
+  levelsSignature = signature;
+
+  levelsCache = LEVEL_SPEC.map((spec) => ({
+    id: spec.id,
+    index: spec.index,
+    minLength: withLength && spec.lengthSteps !== null
+      ? base + spec.lengthSteps * CONFIG.LEVEL_GAP
+      : 0,
+    // On n'exige jamais plus de types qu'il n'en reste d'actifs.
+    minTypes: Math.min(spec.minTypes, types.length),
+  }));
+  return levelsCache;
+}
 
 /* =============================================================================
  * 2. DÉTECTION DES TYPES DE CARACTÈRES / Определение типов символов
@@ -178,8 +406,12 @@ export function computeScore(length, typesCount, level) {
   if (level.index === 3) return 100;
 
   const next = CONFIG.LEVELS.find((l) => l.index === level.index + 1);
-  const lengthProgress = Math.min(1, length / next.minLength);
-  const typesProgress  = Math.min(1, typesCount / next.minTypes);
+  if (!next) return 100;
+
+  // Un seuil à 0 (critère désactivé dans l'éditeur) est DÉJÀ atteint : sans
+  // cette garde, la division donnerait NaN et la barre se figerait.
+  const lengthProgress = next.minLength > 0 ? Math.min(1, length / next.minLength) : 1;
+  const typesProgress  = next.minTypes  > 0 ? Math.min(1, typesCount / next.minTypes) : 1;
   const progress = (lengthProgress + typesProgress) / 2;
 
   return Math.round(Math.min(base + progress * 25, base + 24));
@@ -246,6 +478,55 @@ export function crackTimeSeconds(bits) {
  * ============================================================================= */
 
 /**
+ * FR : Évalue TOUS les critères déclarés dans `CONFIG.CRITERIA`, activés ou non.
+ *      Chaque ligne de la check-list de l'écran est construite à partir d'un
+ *      élément de ce tableau : ajouter un critère au CONFIG suffit pour le voir
+ *      apparaître, sans écrire une seule ligne de HTML.
+ * RU : Оценивает ВСЕ критерии из CONFIG.CRITERIA — включённые и выключенные.
+ *      Каждая строка чек-листа строится из элемента этого массива: добавил
+ *      критерий в конфиг — строка появилась, HTML править не нужно.
+ *
+ * @param {number} length longueur en points de code
+ * @param {object} types  types de caractères détectés
+ * @param {{common:boolean, repetition:boolean, sequence:boolean}} flags
+ */
+function evaluateCriteria(length, types, flags) {
+  return CONFIG.CRITERIA.map((criterion) => {
+    const row = {
+      id: criterion.id,
+      kind: criterion.kind,
+      enabled: criterion.enabled,
+      bonus: Boolean(criterion.bonus),
+      ok: true,
+    };
+
+    switch (criterion.kind) {
+      case 'length':
+        row.min = criterion.min;
+        row.value = length;
+        row.ok = length >= criterion.min;
+        break;
+
+      case 'type':
+        row.type = criterion.type;
+        row.ok = Boolean(types[criterion.type]);
+        break;
+
+      case 'forbid':
+        // Un critère « interdit » est rempli tant que le défaut est ABSENT.
+        row.check = criterion.check;
+        row.ok = !flags[criterion.check];
+        break;
+
+      default:
+        row.ok = true;
+    }
+
+    return row;
+  });
+}
+
+/**
  * FR : Analyse complète d'un mot de passe.
  * RU : Полный анализ пароля.
  *
@@ -257,27 +538,48 @@ export function analyzePassword(password, commonPasswords = null) {
   const pwd = typeof password === 'string' ? password : '';
   const length = codePointLength(pwd);
   const types = detectTypes(pwd);
-  const typesCount = TYPE_IDS.reduce((n, id) => n + (types[id] ? 1 : 0), 0);
 
-  // --- Mot de passe courant ? / Частый пароль? ---------------------------
+  // Seuls les types RÉELLEMENT exigés comptent : décocher « majuscule » dans
+  // l'éditeur le retire du décompte ET des paliers, tout est cohérent.
+  // Только ДЕЙСТВИТЕЛЬНО требуемые типы идут в счёт.
+  const typesCount = activeTypeIds().reduce((n, id) => n + (types[id] ? 1 : 0), 0);
+
+  // --- Défauts repérés (servent aux critères « interdits ») --------------
   const isCommon = isCommonPassword(pwd, commonPasswords);
+  const repetition = hasRepetition(pwd);
+  const sequence = hasSequence(pwd);
+
+  // --- Critères : TOUS évalués ; les désactivés restent visibles pour
+  //     l'éditeur de l'interface, mais ne comptent pour rien.
+  const allCriteria = evaluateCriteria(length, types, {
+    common: isCommon,
+    repetition,
+    sequence,
+  });
+  const criteria = allCriteria.filter((criterion) => criterion.enabled);
 
   // --- Niveau officiel (cahier des charges) / Официальный уровень --------
-  let level = classify(length, typesCount, types.special);
+  // Un champ VIDE reste toujours au plus bas : sans cette garde, désactiver
+  // tous les critères dans l'éditeur rendrait la chaîne vide « Très fort ».
+  // Пустое поле всегда на самом низком уровне.
+  let level = length === 0
+    ? CONFIG.LEVELS[CONFIG.LEVELS.length - 1]
+    : classify(length, typesCount, types.special);
+
+  // Chaque critère « interdit » non respecté fait perdre FORBID_PENALTY niveaux.
+  // Aucun n'est actif par défaut : le barème du cahier des charges est intact.
+  const penalty = criteria.filter((c) => c.kind === 'forbid' && !c.ok).length
+                  * CONFIG.FORBID_PENALTY;
+  if (penalty > 0 && level.index > 0) {
+    const target = Math.max(0, level.index - penalty);
+    level = CONFIG.LEVELS.find((l) => l.index === target) || level;
+  }
+
   let downgraded = false;
   if (CONFIG.DOWNGRADE_COMMON_PASSWORDS && isCommon && level.index > 0) {
     level = CONFIG.LEVELS[CONFIG.LEVELS.length - 1]; // faible
     downgraded = true;
   }
-
-  // --- Critères affichés à l'écran / Критерии для чек-листа --------------
-  const criteria = [
-    { id: 'length',    ok: length >= CONFIG.MIN_LENGTH_CRITERION, value: length },
-    { id: 'lowercase', ok: types.lowercase },
-    { id: 'uppercase', ok: types.uppercase },
-    { id: 'digits',    ok: types.digits },
-    { id: 'special',   ok: types.special },
-  ];
 
   // --- Que faire pour monter d'un niveau ? / Что нужно для след. уровня --
   const next = CONFIG.LEVELS.find((l) => l.index === level.index + 1) || null;
@@ -299,17 +601,19 @@ export function analyzePassword(password, commonPasswords = null) {
     level: level.id,              // 'faible' | 'moyen' | 'fort' | 'tres_fort'
     levelIndex: level.index,      // 0 | 1 | 2 | 3
     score: computeScore(length, typesCount, level),
-    criteria,
+    criteria,                     // critères ACTIFS (check-list officielle)
+    allCriteria,                  // + les critères désactivés, pour l'éditeur
     nextLevel,
     isEmpty: length === 0,
     // ---- bonus (hors cahier des charges) / бонус (сверх ТЗ) ----
     bonus: {
       isCommon,
       downgraded,
+      penalizedLevels: penalty,
       entropyBits: bits,
       crackTimeSeconds: crackTimeSeconds(bits),
-      hasRepetition: hasRepetition(pwd),
-      hasSequence: hasSequence(pwd),
+      hasRepetition: repetition,
+      hasSequence: sequence,
     },
   };
 }
@@ -395,4 +699,8 @@ export function generateStrongPassword(length = 20) {
   return chars.join('');
 }
 
-export default { analyzePassword, generateStrongPassword, classify, detectTypes, CONFIG };
+export default {
+  analyzePassword, generateStrongPassword, classify, detectTypes, CONFIG,
+  getCriteria, setCriterion, setLevelGap, resetCriteria, isDefaultCriteria,
+  exportSettings, importSettings,
+};

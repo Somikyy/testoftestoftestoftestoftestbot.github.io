@@ -74,6 +74,31 @@ export const STRINGS = {
     crit_special: 'Un caractère spécial (!@#…)',
     crit_ok: 'validé',
     crit_todo: 'à faire',
+    crit_off: 'critère désactivé',
+
+    // Critères facultatifs : proposés dans l'éditeur, éteints par défaut.
+    crit_no_repetition: 'Aucune répétition (aaaa, abcabc…)',
+    crit_no_sequence: 'Aucune suite (1234, azerty…)',
+    crit_not_common: 'Absent des mots de passe courants',
+
+    // Éditeur de critères
+    criteria_title_custom: 'Critères personnalisés',
+    edit_criteria: 'Modifier',
+    edit_done: 'Terminé',
+    edit_hint: 'Activez, désactivez ou ajustez les critères : le barème se recalcule.',
+    crit_less: 'Diminuer la longueur minimale',
+    crit_more: 'Augmenter la longueur minimale',
+    settings_gap: 'Écart entre les niveaux',
+    settings_gap_less: 'Diminuer l’écart entre les niveaux',
+    settings_gap_more: 'Augmenter l’écart entre les niveaux',
+    settings_levels: 'Barème recalculé',
+    settings_rule: '≥ {len} car. · {types} types',
+    settings_rule_none: 'par défaut',
+    settings_reset: 'Rétablir le cahier des charges',
+    settings_default_note: 'Réglages d’origine : barème exact du cahier des charges.',
+    settings_custom_note: 'Réglages personnalisés : le barème s’écarte du cahier des charges.',
+    settings_restored: 'Critères rétablis',
+    penalty_note: 'Critère interdit non respecté : {n} niveau perdu.|Critères interdits non respectés : {n} niveaux perdus.',
     // Annonce vocale rejouée à chaque frappe (aria-live).
     announce: 'Niveau : {level}, {percent} %.',
 
@@ -157,6 +182,31 @@ export const STRINGS = {
     crit_special: 'Спецсимвол (!@#…)',
     crit_ok: 'выполнено',
     crit_todo: 'не выполнено',
+    crit_off: 'критерий отключён',
+
+    // Необязательные критерии: есть в редакторе, по умолчанию выключены.
+    crit_no_repetition: 'Без повторов (aaaa, abcabc…)',
+    crit_no_sequence: 'Без последовательностей (1234, йцукен…)',
+    crit_not_common: 'Нет в списке частых паролей',
+
+    // Редактор критериев
+    criteria_title_custom: 'Свои критерии',
+    edit_criteria: 'Изменить',
+    edit_done: 'Готово',
+    edit_hint: 'Включайте, выключайте и настраивайте критерии — шкала пересчитается.',
+    crit_less: 'Уменьшить минимальную длину',
+    crit_more: 'Увеличить минимальную длину',
+    settings_gap: 'Шаг между уровнями',
+    settings_gap_less: 'Уменьшить шаг между уровнями',
+    settings_gap_more: 'Увеличить шаг между уровнями',
+    settings_levels: 'Пересчитанная шкала',
+    settings_rule: '≥ {len} симв. · {types} тип.',
+    settings_rule_none: 'по умолчанию',
+    settings_reset: 'Вернуть критерии из ТЗ',
+    settings_default_note: 'Исходные настройки: шкала точно по техзаданию.',
+    settings_custom_note: 'Свои настройки: шкала отличается от техзадания.',
+    settings_restored: 'Критерии восстановлены',
+    penalty_note: 'Нарушен запрещающий критерий: минус {n} уровень.|Нарушены запрещающие критерии: минус {n} уровня.|Нарушены запрещающие критерии: минус {n} уровней.',
     announce: 'Уровень: {level}, {percent} %.',
 
     details_title: 'Подробности',
@@ -233,6 +283,31 @@ export const STRINGS = {
     crit_special: 'A special character (!@#…)',
     crit_ok: 'met',
     crit_todo: 'not met',
+    crit_off: 'criterion disabled',
+
+    // Optional criteria: offered in the editor, switched off by default.
+    crit_no_repetition: 'No repetition (aaaa, abcabc…)',
+    crit_no_sequence: 'No sequence (1234, qwerty…)',
+    crit_not_common: 'Not a common password',
+
+    // Criteria editor
+    criteria_title_custom: 'Custom criteria',
+    edit_criteria: 'Edit',
+    edit_done: 'Done',
+    edit_hint: 'Turn criteria on or off and tune them — the scale is recomputed.',
+    crit_less: 'Decrease the minimum length',
+    crit_more: 'Increase the minimum length',
+    settings_gap: 'Gap between levels',
+    settings_gap_less: 'Decrease the gap between levels',
+    settings_gap_more: 'Increase the gap between levels',
+    settings_levels: 'Recomputed scale',
+    settings_rule: '≥ {len} chars · {types} types',
+    settings_rule_none: 'by default',
+    settings_reset: 'Restore the specification',
+    settings_default_note: 'Original settings: exactly the specification scale.',
+    settings_custom_note: 'Custom settings: the scale differs from the specification.',
+    settings_restored: 'Criteria restored',
+    penalty_note: 'A forbidden criterion is not met: {n} level lost.|Forbidden criteria not met: {n} levels lost.',
     announce: 'Level: {level}, {percent}%.',
 
     details_title: 'Details',

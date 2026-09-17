@@ -35,7 +35,7 @@ passe sur le réseau est lui-même une faille de sécurité.*
 | Exigence | Où c'est fait | Comment |
 |---|---|---|
 | **Analyse en temps réel lors de la saisie** | `miniapp/app.js` | Écouteur `input` sur le champ ; à chaque frappe l'analyse est relancée et toute l'interface est mise à jour |
-| Longueur minimale (ex. ≥ 8) | `strength.js` → `CONFIG.MIN_LENGTH_CRITERION` | Constante modifiable en un seul endroit |
+| Longueur minimale (ex. ≥ 8) | `strength.js` → critère `length` de `CONFIG.CRITERIA` | Seuil déclaré en un seul endroit, réglable aussi depuis l'écran (bouton « Modifier ») |
 | Présence de majuscules et minuscules | `strength.js` → `detectTypes()` | Expressions régulières Unicode `\p{Lu}` / `\p{Ll}` |
 | Présence de chiffres | `strength.js` → `detectTypes()` | `\p{Nd}` |
 | Présence de caractères spéciaux | `strength.js` → `detectTypes()` | `[^\p{L}\p{N}]` — tout ce qui n'est ni lettre ni chiffre |
@@ -51,10 +51,32 @@ passe sur le réseau est lui-même une faille de sécurité.*
 
 ## 3. Règles de classification
 
-Les règles sont déclarées **de façon déclarative** dans `strength.js` :
+Les critères sont déclarés **de façon déclarative** dans `strength.js`, et les 4 paliers en
+sont **déduits** — rien n'est écrit deux fois :
 
 ```js
-LEVELS: [
+CRITERIA: [
+  { id: 'length',    kind: 'length', enabled: true, min: 8 },
+  { id: 'lowercase', kind: 'type',   enabled: true, type: 'lowercase' },
+  { id: 'uppercase', kind: 'type',   enabled: true, type: 'uppercase' },
+  { id: 'digits',    kind: 'type',   enabled: true, type: 'digits' },
+  { id: 'special',   kind: 'type',   enabled: true, type: 'special' },
+  // … trois critères supplémentaires, désactivés par défaut
+],
+LEVEL_GAP: 4,
+```
+
+| Palier | Longueur exigée | Types exigés |
+|---|---|---|
+| Moyen | `min` | 2 |
+| Fort | `min + LEVEL_GAP` | 3 |
+| Très fort | `min + 2 × LEVEL_GAP` | 4 |
+
+Avec les valeurs livrées (`min: 8`, `LEVEL_GAP: 4`), `CONFIG.LEVELS` vaut donc **exactement**
+le barème demandé :
+
+```js
+[
   { id: 'tres_fort', index: 3, minLength: 16, minTypes: 4 },
   { id: 'fort',      index: 2, minLength: 12, minTypes: 3 },
   { id: 'moyen',     index: 1, minLength: 8,  minTypes: 2 },
@@ -64,6 +86,10 @@ LEVELS: [
 
 `classify()` parcourt cette liste **du plus fort au plus faible** et retient le premier niveau
 dont **toutes** les conditions sont satisfaites.
+
+L'écran permet de modifier ces critères en cours d'utilisation (bouton « Modifier » au-dessus
+de la check-list) : le barème est alors recalculé et affiché. Tant qu'on n'y touche pas, ou
+après « Rétablir le cahier des charges », le comportement est celui décrit ici.
 
 | Niveau du cahier des charges | Condition implémentée | Vérifié par |
 |---|---|---|
@@ -154,4 +180,5 @@ node --test tests/*.test.js
 
 Les tests couvrent les quatre niveaux, **les frontières exactes** (7 vs 8, 11 vs 12, 15 vs 16
 caractères ; 1 vs 2, 2 vs 3, 3 vs 4 types), les cas limites (chaîne vide, valeurs non textuelles,
-Unicode, emoji) et le générateur.
+Unicode, emoji), le générateur, et — section 16 — les **critères dynamiques** : réglage des
+seuils, activation/désactivation, recalcul des paliers et retour au cahier des charges.

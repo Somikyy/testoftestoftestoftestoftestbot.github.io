@@ -52,6 +52,15 @@ import {
   isCommonPassword,
   generateStrongPassword,
   COMMON_PASSWORDS,
+  getCriteria,
+  findCriterion,
+  activeTypeIds,
+  setCriterion,
+  setLevelGap,
+  resetCriteria,
+  isDefaultCriteria,
+  exportSettings,
+  importSettings,
 } from '../miniapp/strength.js';
 
 /* =============================================================================
@@ -1169,5 +1178,243 @@ describe('15. Structure du resultat — criteres et palier suivant', () => {
     const court = analyzePassword('aB1!aB1!').bonus.entropyBits;
     const long = analyzePassword('aB1!aB1!aB1!aB1!').bonus.entropyBits;
     assert.ok(long > court, 'un mot de passe plus long doit avoir une entropie plus elevee');
+  });
+});
+
+/* =============================================================================
+ * 16. CRITERES DYNAMIQUES — l'editeur de l'interface passe par ces fonctions
+ * -----------------------------------------------------------------------------
+ *    Chaque test remet les criteres du cahier des charges dans un `finally` :
+ *    la configuration est un etat partage par tout le fichier.
+ * ========================================================================== */
+
+describe('16. Criteres dynamiques — reglages, paliers deduits, remise a zero', () => {
+  test('par defaut, les criteres sont exactement ceux du cahier des charges', () => {
+    assert.equal(isDefaultCriteria(), true);
+    assert.deepEqual(
+      getCriteria().filter((c) => c.enabled).map((c) => c.id),
+      ['length', 'lowercase', 'uppercase', 'digits', 'special'],
+    );
+    assert.equal(findCriterion('length').min, 8);
+    assert.deepEqual(activeTypeIds(), ['lowercase', 'uppercase', 'digits', 'special']);
+  });
+
+  test('allCriteria expose TOUS les criteres, criteria seulement les actifs', () => {
+    const r = analyzePassword('abc');
+    assert.equal(r.allCriteria.length, 8, '5 du cahier des charges + 3 proposes');
+    assert.equal(r.criteria.length, 5, 'seuls les 5 actifs comptent');
+    assert.ok(r.allCriteria.every((c) => typeof c.enabled === 'boolean'));
+  });
+
+  test('deplacer le seuil de longueur deplace les 4 paliers', () => {
+    try {
+      setCriterion('length', { min: 10 });
+      assert.deepEqual(
+        CONFIG.LEVELS.map((l) => [l.id, l.minLength, l.minTypes]),
+        [['tres_fort', 18, 4], ['fort', 14, 3], ['moyen', 10, 2], ['faible', 0, 0]],
+      );
+      // 8 caracteres ne suffisent plus pour « Moyen ».
+      assert.equal(analyzePassword('Abcdefg1').level, 'faible');
+      assert.equal(analyzePassword('Abcdefghij1').level, 'moyen');
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('le seuil de longueur reste dans les bornes declarees', () => {
+    try {
+      setCriterion('length', { min: 999 });
+      assert.equal(findCriterion('length').min, 32, 'plafonne a maxAllowed');
+      setCriterion('length', { min: 1 });
+      assert.equal(findCriterion('length').min, 4, 'plancher a minAllowed');
+      setCriterion('length', { min: 'douze' });
+      assert.equal(findCriterion('length').min, 4, 'une valeur absurde ne change rien');
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('l\'ecart entre paliers est reglable et borne', () => {
+    try {
+      setLevelGap(2);
+      assert.deepEqual(CONFIG.LEVELS.map((l) => l.minLength), [12, 10, 8, 0]);
+      setLevelGap(99);
+      assert.equal(CONFIG.LEVEL_GAP, 8, 'plafonne a 8');
+      setLevelGap(0);
+      assert.equal(CONFIG.LEVEL_GAP, 1, 'plancher a 1');
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('desactiver un type le retire du decompte ET des exigences', () => {
+    try {
+      setCriterion('uppercase', { enabled: false });
+      assert.deepEqual(activeTypeIds(), ['lowercase', 'digits', 'special']);
+      // On n'exige jamais plus de types qu'il n'en reste.
+      assert.deepEqual(CONFIG.LEVELS.map((l) => l.minTypes), [3, 3, 2, 0]);
+
+      const r = analyzePassword('abcdefghijklmnop1!');
+      assert.equal(r.typesCount, 3, 'la majuscule ne compte plus');
+      assert.equal(r.level, 'tres_fort', '16 caracteres et les 3 types exiges');
+      assert.equal(r.criteria.length, 4, 'la ligne « majuscule » sort de la check-list');
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('un critere « interdit » active fait perdre un niveau', () => {
+    const avant = analyzePassword('Abcdefgh1234!xyz');
+    assert.equal(avant.level, 'tres_fort');
+    assert.equal(avant.bonus.penalizedLevels, 0, 'aucun critere interdit par defaut');
+
+    try {
+      setCriterion('no_sequence', { enabled: true });
+      const apres = analyzePassword('Abcdefgh1234!xyz'); // contient « abcd » et « 1234 »
+      assert.equal(apres.bonus.penalizedLevels, 1);
+      assert.equal(apres.level, 'fort', 'un niveau perdu');
+      assert.equal(apres.criteria.length, 6, 'le critere s\'ajoute a la check-list');
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('les criteres interdits cumulent leurs penalites', () => {
+    try {
+      setCriterion('no_sequence', { enabled: true });
+      setCriterion('not_common', { enabled: true });
+      // « Azerty123456! » : suite clavier + mot de passe courant.
+      const r = analyzePassword('Azertyuiop123456!', COMMON_PASSWORDS);
+      assert.ok(r.bonus.penalizedLevels >= 1, 'au moins une penalite');
+      assert.ok(r.levelIndex < 3, 'le niveau maximal n\'est plus atteignable');
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('un critere desactive n\'influence plus rien', () => {
+    try {
+      setCriterion('special', { enabled: false });
+      const r = analyzePassword('Abcdefghijklmnop1');
+      assert.equal(r.criteria.length, 4);
+      assert.equal(r.typesCount, 3, 'le caractere special ne compte plus');
+      assert.equal(r.level, 'tres_fort', '17 caracteres, les 3 types exiges');
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('le score reste un nombre fini meme sans aucune exigence', () => {
+    try {
+      for (const id of ['length', 'lowercase', 'uppercase', 'digits', 'special']) {
+        setCriterion(id, { enabled: false });
+      }
+      for (const mdp of ['', 'a', 'abc', 'Abcdefgh1!']) {
+        const r = analyzePassword(mdp);
+        assert.ok(Number.isFinite(r.score), `score non fini pour "${mdp}"`);
+        assert.ok(r.score >= 0 && r.score <= 100, `score hors bornes pour "${mdp}"`);
+      }
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('la chaine vide reste « Faible » meme sans aucun critere actif', () => {
+    try {
+      for (const c of getCriteria()) setCriterion(c.id, { enabled: false });
+      const r = analyzePassword('');
+      assert.equal(r.level, 'faible', 'un champ vide ne peut pas etre fort');
+      assert.equal(r.levelIndex, 0);
+      assert.equal(r.score, 0);
+      assert.equal(r.isEmpty, true);
+      // Un vrai mot de passe, lui, n'est plus contraint par rien.
+      assert.equal(analyzePassword('a').level, 'tres_fort', 'plus aucune exigence');
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('CONFIG.LEVELS garde la meme reference tant que rien ne bouge', () => {
+    const premier = CONFIG.LEVELS;
+    assert.equal(CONFIG.LEVELS, premier, 'aucun changement : meme tableau');
+    // classify() renvoie un element de CE tableau — l'identite doit tenir.
+    assert.ok(premier.includes(classify(20, 4, true)));
+
+    try {
+      setCriterion('length', { min: 10 });
+      assert.notEqual(CONFIG.LEVELS, premier, 'un reglage a change : nouveau tableau');
+      assert.ok(CONFIG.LEVELS.includes(classify(20, 4, true)));
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('MIN_LENGTH_CRITERION reste un raccourci vers le critere de longueur', () => {
+    try {
+      CONFIG.MIN_LENGTH_CRITERION = 14;
+      assert.equal(findCriterion('length').min, 14);
+      assert.equal(CONFIG.MIN_LENGTH_CRITERION, 14);
+      assert.equal(CONFIG.LEVELS.find((l) => l.id === 'moyen').minLength, 14);
+    } finally {
+      resetCriteria();
+    }
+    assert.equal(CONFIG.MIN_LENGTH_CRITERION, 8, 'configuration restauree');
+  });
+
+  test('export/import font un aller-retour fidele', () => {
+    try {
+      setCriterion('length', { min: 12 });
+      setCriterion('digits', { enabled: false });
+      setCriterion('no_repetition', { enabled: true });
+      setLevelGap(3);
+
+      const sauvegarde = JSON.parse(JSON.stringify(exportSettings()));
+      resetCriteria();
+      assert.equal(isDefaultCriteria(), true, 'remise a zero effective');
+
+      importSettings(sauvegarde);
+      assert.equal(findCriterion('length').min, 12);
+      assert.equal(findCriterion('digits').enabled, false);
+      assert.equal(findCriterion('no_repetition').enabled, true);
+      assert.equal(CONFIG.LEVEL_GAP, 3);
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('importSettings ignore ce qu\'il ne comprend pas', () => {
+    try {
+      importSettings(null);
+      importSettings('nimporte quoi');
+      importSettings({ criteria: { inconnu: { enabled: true } }, gap: 'trois' });
+      assert.equal(isDefaultCriteria(), true, 'rien n\'a bouge');
+
+      importSettings({ criteria: { length: { min: 1000 } } });
+      assert.equal(findCriterion('length').min, 32, 'valeur bornee, pas rejetee');
+    } finally {
+      resetCriteria();
+    }
+  });
+
+  test('resetCriteria() rend une configuration identique au cahier des charges', () => {
+    setCriterion('length', { min: 20 });
+    setCriterion('special', { enabled: false });
+    setLevelGap(7);
+    assert.equal(isDefaultCriteria(), false);
+
+    resetCriteria();
+    assert.equal(isDefaultCriteria(), true);
+    assert.deepEqual(
+      CONFIG.LEVELS.map((l) => [l.id, l.minLength, l.minTypes]),
+      [['tres_fort', 16, 4], ['fort', 12, 3], ['moyen', 8, 2], ['faible', 0, 0]],
+    );
+  });
+
+  test('getCriteria() rend une copie : la modifier ne touche pas le moteur', () => {
+    const copie = getCriteria();
+    copie[0].min = 99;
+    copie[1].enabled = false;
+    assert.equal(findCriterion('length').min, 8);
+    assert.equal(findCriterion('lowercase').enabled, true);
   });
 });
